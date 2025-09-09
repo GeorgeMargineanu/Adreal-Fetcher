@@ -45,8 +45,32 @@ def merge_data(stats_data, brands_data, websites_data):
 
     return all_rows
 
-    def clean_data(self):
-        pass
+def decide_content_type(website):
+    lowered_website = website.lower()
+    if 'google.' in lowered_website or 'bing.' in lowered_website:
+        return 'Search'
+    if 'facebook' in lowered_website or \
+        'instagram' in lowered_website or \
+        'tiktok' in lowered_website or \
+        'youtube' in lowered_website:
+        return 'Social'
+    return 'Standard'
+
+def clean_data(df):
+    columns_to_keep = ["Brand owner", "Brand", "Product", "Content type", "Media channel", "Ad contacts"]
+    df = df.rename(columns={"brand_owner_name": "Brand owner",
+                        "brand_name": "Brand",
+                        "website_name": "Media channel",
+                        "ad_cont": "Ad contacts"
+                        })
+    if 'content_type' in df.columns:
+        df.drop('content_type', axis=1)
+    
+    df["Product"] = 'None'
+    df['Content type'] = df['Media channel'].apply(lambda website: decide_content_type(website))
+    df = df[columns_to_keep]
+
+    return df
 
 
 if __name__ == "__main__":
@@ -57,8 +81,8 @@ if __name__ == "__main__":
 
     start = time.time()
 
-    #today = datetime.today().strftime("%Y%m%d")
-    #period = '_'.join(('month', today))
+    #today = datetime.today().strftime("%Y%m")
+    #period = '_'.join(('month', today + '01')) # need to check!!!!!!!!!!!!!!!!!!!!!!!
     period = "month_20250801"
 
     # --- Fetch all in memory ---
@@ -87,6 +111,7 @@ if __name__ == "__main__":
 
     # --- Save only final file ---
     df = pd.DataFrame(merged_rows).drop_duplicates()
+    df = clean_data(df)
     df.to_csv("final_mapped.csv", index=False)
     print(f"\nSaved final merged file with {len(df)} rows")
 
