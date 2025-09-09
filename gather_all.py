@@ -72,11 +72,11 @@ if __name__ == "__main__":
     adreal_fetcher.fetch_multi_segments()
     stats_data = adreal_fetcher.all_results
     
-    print("Merging all data...")
+    print("\nMerging all data...")
     # --- Merge everything ---
     merged_rows = merge_data(stats_data, brands_data, websites_data)
 
     # --- Save only final file ---
     df = pd.DataFrame(merged_rows).drop_duplicates()
     df.to_csv("final_mapped.csv", index=False)
-    print(f"Saved final merged file with {len(df)} rows")
+    print(f"\nSaved final merged file with {len(df)} rows")

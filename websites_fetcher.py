@@ -18,7 +18,7 @@ class PublisherFetcher:
 
     # ---------------- LOGIN ----------------
     def login(self):
-        print('Started getting Websites/Publishers data.')
+        print('\nStarted getting Websites/Publishers data.')
         login_page = self.session.get(self.LOGIN_URL)
         csrftoken = self.session.cookies.get("csrftoken")
         payload = {

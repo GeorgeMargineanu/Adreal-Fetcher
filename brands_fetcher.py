@@ -18,7 +18,7 @@ class BrandFetcher:
 
     # ---------------- LOGIN ----------------
     def login(self):
-        print('Started getting Brands data.')
+        print('\nStarted getting Brands data.')
         login_page = self.session.get(self.LOGIN_URL)
         csrftoken = self.session.cookies.get("csrftoken")
         payload = {

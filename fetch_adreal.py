@@ -6,7 +6,7 @@ import time
 
 class AdRealFetcher:
     def __init__(self, username, password, market="ro", period_range="20250801,20250831,month",
-                 brand_ids="13549,701", limit=10000, max_threads=5, target_metric="ad_cont,ru"):
+                 brand_ids="", limit=10000, max_threads=5, target_metric="ad_cont,ru"):
         self.BASE_URL = "https://adreal.gemius.com/api"
         self.LOGIN_URL = f"{self.BASE_URL}/login/?next=/api/"
         self.username = username
@@ -27,7 +27,7 @@ class AdRealFetcher:
 
     # ---------------- LOGIN ----------------
     def login(self):
-        print('Started getting Ad_conts metric.')
+        print('\nStarted getting Ad_conts metric.')
         login_page = self.session.get(self.LOGIN_URL)
         csrftoken = self.session.cookies.get("csrftoken")
         payload = {
@@ -134,6 +134,7 @@ if __name__ == "__main__":
     fetcher = AdRealFetcher(
         username="UnitedRO_Teo.Zamfirescu",
         password="TeopassUM25",
+        brand_ids= "13549,701"
     )
 
     fetcher.login()
