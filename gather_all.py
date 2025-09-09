@@ -3,6 +3,7 @@ from websites_fetcher import PublisherFetcher
 from fetch_adreal import AdRealFetcher
 import pandas as pd
 from datetime import datetime
+import time
 
 def return_lookup(data):
     """Helper: build id→name lookup dict."""
@@ -52,6 +53,9 @@ if __name__ == "__main__":
     username = "UnitedRO_Teo.Zamfirescu"
     password = "TeopassUM25"
     market = "ro"
+    brand_ids= "13549,701"
+
+    start = time.time()
 
     #today = datetime.today().strftime("%Y%m%d")
     #period = '_'.join(('month', today))
@@ -66,7 +70,12 @@ if __name__ == "__main__":
     publisher_fetcher.login()
     websites_data = publisher_fetcher.fetch_publishers(period=period)
 
-    adreal_fetcher = AdRealFetcher(username, password, market)
+    adreal_fetcher = AdRealFetcher(
+        username=username,
+        password=password,
+        market=market,
+        brand_ids=brand_ids  # now it's correctly assigned
+    )
     adreal_fetcher.login()
     adreal_fetcher.get_platform_id()
     adreal_fetcher.fetch_multi_segments()
@@ -80,3 +89,7 @@ if __name__ == "__main__":
     df = pd.DataFrame(merged_rows).drop_duplicates()
     df.to_csv("final_mapped.csv", index=False)
     print(f"\nSaved final merged file with {len(df)} rows")
+
+    end = time.time()
+    time_spent = round((end - start), 2)
+    print(f"\nThe pipeline took {time_spent} seconds.")
