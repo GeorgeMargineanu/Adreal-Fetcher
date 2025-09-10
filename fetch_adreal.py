@@ -3,9 +3,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import pandas as pd
 import time
+from urllib.parse import urlencode
 
 class AdRealFetcher:
-    def __init__(self, username, password, market="ro", period_range="20250801,20250831,month",
+    def __init__(self, username, password, market="ro",
+                 period_range="20250801,20250831,month",
                  brand_ids="", limit=10000, max_threads=5, target_metric="ad_cont,ru"):
         self.BASE_URL = "https://adreal.gemius.com/api"
         self.LOGIN_URL = f"{self.BASE_URL}/login/?next=/api/"
@@ -17,13 +19,24 @@ class AdRealFetcher:
         self.limit = limit
         self.max_threads = max_threads
         self.target_metric = target_metric
-        
+
         self.session = requests.Session()
         self.platform_id = None
         self.all_results = []
 
-        # Default combined segments
-        self.combined_segments = "brand_owner,brand,product,content_type,website,publisher"
+        # conservative default: product + content type (you can expand later)
+        self.combined_segments = "brand_owner,brand,product,content_type,website,publisher,platform"
+        # computed period label we will filter stats by (e.g. "month_20250801")
+        self.period_label = self._period_label_from_range(period_range)
+
+    def _period_label_from_range(self, periods_range):
+        # periods_range expected "YYYYMMDD,YYYYMMDD,periodtype" (e.g. "20250801,20250831,month")
+        parts = periods_range.split(",")
+        if not parts:
+            return None
+        start = parts[0]
+        period_type = parts[2] if len(parts) >= 3 else "day"
+        return f"{period_type}_{start}"
 
     # ---------------- LOGIN ----------------
     def login(self):
@@ -48,20 +61,34 @@ class AdRealFetcher:
         resp.raise_for_status()
         return resp.json()
 
-    def get_platform_id(self):
-        platforms = self.fetch_options("platforms")["results"]
-        self.platform_id = platforms[0]["id"]
+    def list_platforms(self):
+        """Return raw platforms list (useful to inspect platform codes & ids)"""
+        j = self.fetch_options("platforms")
+        results = j.get("results", j)
+        # print friendly table
+        print("Available platforms (sample):")
+        for p in results:
+            # platform objects may contain id/code/name - print keys intelligently
+            print({k: p.get(k) for k in ("id", "code", "label", "name") if k in p})
+        return results
 
-    # ---------------- FETCH STATS ----------------
+    def get_platform_id(self):
+        platforms = self.fetch_options("platforms").get("results", [])
+        if not platforms:
+            raise RuntimeError("No platforms found")
+        # save numeric id of first platform (what you had before)
+        self.platform_id = platforms[0]["id"]
+        print("Platform id (first):", self.platform_id)
+        return platforms
+
+    # ---------------- FETCH STATS (original multi-segment) ----------------
     def fetch_multi_segments(self):
         params_base = {
             "metrics": self.target_metric,
             "platforms": self.platform_id,
             "periods_range": self.period_range,
             "limit": self.limit,
-            "mode": "total",
             "brands": self.brand_ids,
-            "accumulation_mode": "true",
             "segments": self.combined_segments
         }
 
@@ -95,14 +122,54 @@ class AdRealFetcher:
 
         self.all_results = results
 
-    # ---------------- SAVE ----------------
-    def save_json(self, filename):
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(self.all_results, f, indent=4, ensure_ascii=False)
+    # ---------------- FETCH STATS (support-style simple brand) ----------------
+    def fetch_data(self, brand_ids, platforms="pc", page_types="search,social,standard",
+                           metrics=None, segments="brand", limit=1000000):
+        """
+        Mimics the support code URL:
+        /stats/?limit=1000000&brands=<ids>&format=json&metrics=ru,ad_cont,reach
+                  &periods_range=<periods_range>&platforms=pc&page_types=search,social,standard&segments=brand
+        """
+        if isinstance(brand_ids, (list, tuple)):
+            brands_param = ",".join(map(str, brand_ids))
+        else:
+            brands_param = str(brand_ids)
 
-    def flatten_to_excel(self, filename):
+        if metrics is None:
+            metrics = "ru,ad_cont,reach"
+
+        params = {
+            "limit": limit,
+            "brands": brands_param,
+            "format": "json",
+            "metrics": metrics,
+            "periods_range": self.period_range,
+            "platforms": platforms,
+            "page_types": page_types,
+            "segments": segments
+        }
+
+        print("Support-style GET ->", f"{self.BASE_URL}/{self.market}/stats/?{urlencode(params)}")
+        r = self.session.get(f"{self.BASE_URL}/{self.market}/stats/", params=params, timeout=120)
+        r.raise_for_status()
+        j = r.json()
+        results = j.get("results", [])
+        print(f"Support-style stats: total_count={j.get('total_count', len(results))}, returned={len(results)}")
+        return results
+
+    # ---------------- SAVE ----------------
+    def save_json(self, filename, data=None):
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(data or self.all_results, f, indent=4, ensure_ascii=False)
+
+    def flatten_to_excel(self, filename, results=None, filter_period=True):
+        """
+        Flatten results -> excel. If filter_period True, only keep stats rows
+        whose 'period' equals the requested period_label (avoids duplicates).
+        """
+        results = results if results is not None else self.all_results
         all_rows = []
-        for item in self.all_results:
+        for item in results:
             seg_info = item.get("segment", {})
 
             row = {}
@@ -114,6 +181,10 @@ class AdRealFetcher:
                     row[seg_type] = seg_values
 
             for stat in item.get("stats", []):
+                if filter_period and self.period_label:
+                    if stat.get("period") != self.period_label:
+                        # skip other stats entries (otherwise will see 3x duplicates)
+                        continue
                 row_copy = row.copy()
                 row_copy["period"] = stat.get("period")
                 for k, v in stat.get("values", {}).items():
@@ -125,23 +196,30 @@ class AdRealFetcher:
         df = pd.DataFrame(all_rows)
         df.to_excel(filename, index=False)
         print(f"Saved {len(df)} rows to {filename}")
+        return df
 
-
-# ---------------- MAIN ----------------
+# ---------------- MAIN DEMO ----------------
 if __name__ == "__main__":
     start_time = time.time()
 
-    fetcher = AdRealFetcher(
-        username="UnitedRO_Teo.Zamfirescu",
-        password="TeopassUM25",
-        brand_ids= "13549,701"
-    )
+    USERNAME = "UnitedRO_Teo.Zamfirescu"
+    PASSWORD = "TeopassUM25"
 
+    fetcher = AdRealFetcher(username=USERNAME, password=PASSWORD, brand_ids="13549")
+
+    # login using your session method
     fetcher.login()
-    fetcher.get_platform_id()
-    fetcher.fetch_multi_segments()
-    fetcher.save_json("ad_conts_segments_multi.json")
-    fetcher.flatten_to_excel("ad_conts_segments_expanded_multi.xlsx")
+
+    # list platforms so you can see what 'pc' corresponds to (id/code)
+    platforms = fetcher.list_platforms()
+
+    # try support-style query for Dream&co (95638)
+    brand_to_test = 13549
+    support_results = fetcher.fetch_data([brand_to_test], platforms="pc",
+                                                 page_types="search,social,standard",
+                                                 segments="brand,product,content_type,website", limit=1000000)
+    fetcher.save_json("support_results.json", support_results)
+    fetcher.flatten_to_excel("support_results.xlsx", results=support_results, filter_period=True)
 
     end_time = time.time()
-    print(f"Fetched and saved data in {round((end_time - start_time)/60, 2)} minutes")
+    print(f"Done in {round((end_time - start_time)/60, 2)} minutes")
