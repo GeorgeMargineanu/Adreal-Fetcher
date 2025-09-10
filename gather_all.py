@@ -147,7 +147,7 @@ if __name__ == "__main__":
 
     df = pd.DataFrame(merged_rows).drop_duplicates()
     df = clean_data(df)
-    df.to_csv("final_mapped.csv", index=False)
+    df.to_csv(f"{period}_Adreal.csv", index=False)
     print(f"\nSaved final merged file with {len(df)} rows")
 
     end = time.time()
