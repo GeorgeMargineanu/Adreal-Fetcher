@@ -149,7 +149,7 @@ class AdRealFetcher:
             "segments": segments
         }
 
-        print("Support-style GET ->", f"{self.BASE_URL}/{self.market}/stats/?{urlencode(params)}")
+        print("GET --->", f"{self.BASE_URL}/{self.market}/stats/?{urlencode(params)}")
         r = self.session.get(f"{self.BASE_URL}/{self.market}/stats/", params=params, timeout=120)
         r.raise_for_status()
         j = r.json()

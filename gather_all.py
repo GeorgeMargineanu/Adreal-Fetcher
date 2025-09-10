@@ -7,12 +7,31 @@ import time
 
 
 def return_lookup(data):
-    """Helper: build id→name lookup dict."""
-    return {dat["id"]: dat["name"] for dat in data}
+    """Helper: build id -> full brand/publisher info dict."""
+    return {dat["id"]: dat for dat in data}
+
+
+def get_brand_owner(brand_id, brands_lookup):
+    """
+    Given a brand ID, traverse the parent_id chain to find the top-level Brand owner.
+    """
+    brand_info = brands_lookup.get(brand_id)
+    if not brand_info:
+        return None  # brand not found
+
+    parent_id = brand_info.get("parent_id")
+    if not parent_id:
+        return brand_info["name"]  # this brand is already a top-level owner
+
+    parent_info = brands_lookup.get(parent_id)
+    if not parent_info:
+        return None  # parent not found
+
+    return parent_info["name"]
 
 
 def merge_data(stats_data, brands_data, websites_data):
-    """Merge stats + brand + websites lookups."""
+    """Merge stats + brand + websites lookups, filling Brand owner properly."""
     brands_lookup = return_lookup(brands_data)
     websites_lookup = return_lookup(websites_data)
 
@@ -21,10 +40,13 @@ def merge_data(stats_data, brands_data, websites_data):
         segment = entry.get("segment", {})
         stats_list = entry.get("stats", [])
 
-        brand_owner_name = brands_lookup.get(segment.get("brand_owner"), segment.get("brand_owner"))
-        brand_name = brands_lookup.get(segment.get("brand"), segment.get("brand"))
-        product_name = brands_lookup.get(segment.get("product"), segment.get("product"))
-        website_name = websites_lookup.get(segment.get("website"), segment.get("website"))
+        brand_id = segment.get("brand")
+        brand_info = brands_lookup.get(brand_id, {})
+        brand_name = brand_info.get("name", brand_id)
+        brand_owner_name = get_brand_owner(brand_id, brands_lookup)
+
+        product_name = brands_lookup.get(segment.get("product"), {}).get("name", segment.get("product"))
+        website_name = websites_lookup.get(segment.get("website"), {}).get("name", segment.get("website"))
 
         # Use API-provided content_type if available
         content_type = segment.get("content_type")
@@ -83,6 +105,8 @@ def clean_data(df):
     if "Content type" not in df.columns:
         df["Content type"] = df["Media channel"].apply(decide_content_type)
 
+    # Remove summaries from Product
+    df = df[df['Media channel'] != 'Segment summary']
     df = df.reindex(columns=columns_to_keep)
 
     return df
@@ -92,7 +116,7 @@ if __name__ == "__main__":
     username = "UnitedRO_Teo.Zamfirescu"
     password = "TeopassUM25"
     market = "ro"
-    parent_brand_ids = ["5297", "13549"]   # <--- list of parent brands
+    parent_brand_ids = ["5297", "13549"]   # <-- only parent brands
 
     start = time.time()
     period = "month_20250801"
