@@ -83,8 +83,8 @@ class PublisherFetcher:
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     fetcher = PublisherFetcher(
-        username="UnitedRO_Teo.Zamfirescu",
-        password="TeopassUM25",
+        username="",
+        password="",
         market="ro",
     )
     fetcher.login()

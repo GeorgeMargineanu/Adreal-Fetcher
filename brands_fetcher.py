@@ -84,8 +84,8 @@ class BrandFetcher:
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     fetcher = BrandFetcher(
-        username="UnitedRO_Teo.Zamfirescu",
-        password="TeopassUM25",
+        username="",
+        password="",
         market="ro",
     )
     fetcher.login()

@@ -202,8 +202,8 @@ class AdRealFetcher:
 if __name__ == "__main__":
     start_time = time.time()
 
-    USERNAME = "UnitedRO_Teo.Zamfirescu"
-    PASSWORD = "TeopassUM25"
+    USERNAME = ""
+    PASSWORD = ""
 
     fetcher = AdRealFetcher(username=USERNAME, password=PASSWORD, brand_ids="13549")
 
