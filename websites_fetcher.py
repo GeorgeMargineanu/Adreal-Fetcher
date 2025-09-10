@@ -3,7 +3,6 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 
-
 class PublisherFetcher:
     def __init__(self, username, password, market="ro", max_threads=5, limit=100000):
         self.BASE_URL = "https://adreal.gemius.com/api"
@@ -90,5 +89,5 @@ if __name__ == "__main__":
     )
     fetcher.login()
     fetcher.fetch_publishers(period="month_20250801")
-    fetcher.save_json("publishers.json")
-    fetcher.save_csv("publishers.csv")
+    #fetcher.save_json("publishers.json")
+    #fetcher.save_csv("publishers.csv")

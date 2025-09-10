@@ -2,9 +2,7 @@ from brands_fetcher import BrandFetcher
 from websites_fetcher import PublisherFetcher
 from fetch_adreal import AdRealFetcher
 import pandas as pd
-from datetime import datetime
-import time
-
+from datetime import datetime, timedelta
 
 def return_lookup(data):
     """Helper: build id -> full brand/publisher info dict."""
@@ -13,7 +11,7 @@ def return_lookup(data):
 
 def get_brand_owner(brand_id, brands_lookup):
     """
-    Given a brand ID, traverse the parent_id chain to find the top-level Brand owner.
+    Given a brand ID, find the top-level Brand owner.
     """
     brand_info = brands_lookup.get(brand_id)
     if not brand_info:
@@ -21,7 +19,7 @@ def get_brand_owner(brand_id, brands_lookup):
 
     parent_id = brand_info.get("parent_id")
     if not parent_id:
-        return brand_info["name"]  # this brand is already a top-level owner
+        return brand_info["name"]  # already a top-level owner
 
     parent_info = brands_lookup.get(parent_id)
     if not parent_info:
@@ -63,10 +61,10 @@ def merge_data(stats_data, brands_data, websites_data):
                 "platform": segment.get("platform", None),
                 "content_type": content_type,
             }
-            # values
+            # add values
             for k, v in stat.get("values", {}).items():
                 row[k] = v
-            # uncertainty
+            # add uncertainty
             for k, v in stat.get("uncertainty", {}).items():
                 row[f"{k}_uncertainty"] = v
             all_rows.append(row)
@@ -79,14 +77,15 @@ def decide_content_type(website):
     if not isinstance(website, str) or not website:
         return "Unknown"
     lowered_website = website.lower()
-    if 'google.' in lowered_website or 'bing.' in lowered_website:
-        return 'Search'
-    if any(social in lowered_website for social in ['facebook', 'instagram', 'tiktok', 'youtube']):
-        return 'Social'
-    return 'Standard'
+    if "google." in lowered_website or "bing." in lowered_website:
+        return "Search"
+    if any(social in lowered_website for social in ["facebook", "instagram", "tiktok", "youtube"]):
+        return "Social"
+    return "Standard"
 
 
 def clean_data(df):
+    """Clean merged DataFrame."""
     columns_to_keep = ["Brand owner", "Brand", "Product", "Content type", "Media channel", "Ad contacts"]
 
     df = df.rename(columns={
@@ -98,30 +97,37 @@ def clean_data(df):
     })
 
     # Drop duplicate content_type if present
-    if 'content_type' in df.columns and 'Content type' in df.columns:
-        df = df.drop('content_type', axis=1)
+    if "content_type" in df.columns and "Content type" in df.columns:
+        df = df.drop("content_type", axis=1)
 
     # Ensure Content type column exists
     if "Content type" not in df.columns:
         df["Content type"] = df["Media channel"].apply(decide_content_type)
 
     # Remove summaries from Product
-    df = df[df['Media channel'] != 'Segment summary']
+    df = df[df["Media channel"] != "Segment summary"]
     df = df.reindex(columns=columns_to_keep)
 
     return df
 
 
-if __name__ == "__main__":
-    username = "UnitedRO_Teo.Zamfirescu"
-    password = "TeopassUM25"
-    market = "ro"
-    parent_brand_ids = ["5297", "13549"]   # <-- only parent brands
+def get_correct_period():
+    """Return the previous month in AdReal API period format."""
+    today = datetime.today()
+    first_of_current_month = datetime(today.year, today.month, 1)
+    previous_month_last_day = first_of_current_month - timedelta(days=1)
+    period = f"month_{previous_month_last_day.strftime('%Y%m01')}"
+    return period
 
-    start = time.time()
-    period = "month_20250801"
 
-    # --- Fetch all in memory ---
+def run_adreal_pipeline(username, password, market="ro", parent_brand_ids=None):
+    """Fetch, merge, clean AdReal data and return a DataFrame."""
+    if parent_brand_ids is None:
+        parent_brand_ids = []
+
+    period = get_correct_period()
+
+    # Fetch brands & websites
     brand_fetcher = BrandFetcher(username, password, market)
     brand_fetcher.login()
     brands_data = brand_fetcher.fetch_brands(period=period)
@@ -130,10 +136,9 @@ if __name__ == "__main__":
     publisher_fetcher.login()
     websites_data = publisher_fetcher.fetch_publishers(period=period)
 
+    # Fetch stats
     adreal_fetcher = AdRealFetcher(username=username, password=password, market=market)
     adreal_fetcher.login()
-
-    # Fetch stats for parent brands, expanded by product/content_type/website
     stats_data = adreal_fetcher.fetch_data(
         parent_brand_ids,
         platforms="pc",
@@ -142,13 +147,7 @@ if __name__ == "__main__":
         limit=1000000
     )
 
-    print("\nMerging all data...")
     merged_rows = merge_data(stats_data, brands_data, websites_data)
-
     df = pd.DataFrame(merged_rows).drop_duplicates()
     df = clean_data(df)
-    df.to_csv(f"{period}_Adreal.csv", index=False)
-    print(f"\nSaved final merged file with {len(df)} rows")
-
-    end = time.time()
-    print(f"\nThe pipeline took {round(end - start, 2)} seconds.")
+    return df
