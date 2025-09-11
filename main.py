@@ -1,6 +1,7 @@
 from google.cloud import secretmanager, bigquery
 from gather_all import run_adreal_pipeline, get_correct_period
 import pandas as pd
+import traceback
 
 def access_secret(secret_id, version_id="latest"):
     client = secretmanager.SecretManagerServiceClient()
@@ -10,11 +11,11 @@ def access_secret(secret_id, version_id="latest"):
     return response.payload.data.decode("UTF-8")
 
 def push_to_bigquery(df):
-    """Delete previous month rows and stream a DataFrame into BigQuery in batches."""
+    """Stream a DataFrame into BigQuery in batches, with safety checks."""
     client = bigquery.Client()
     table_id = "ums-adreal-471711.Mega.DataImport"
 
-    # Rename columns to match BigQuery schema
+    # Rename columns to match BQ schema
     df = df.rename(columns={
         "Brand owner": "BrandOwner",
         "Brand": "Brand",
@@ -24,21 +25,17 @@ def push_to_bigquery(df):
         "Ad contacts": "AdContacts",
     })
 
-    # Ensure Date is string in YYYY-MM-DD format
-    df["Date"] = pd.to_datetime(df["Date"]).dt.strftime("%Y-%m-%d")
+    # Ensure required columns exist
+    required_cols = ["Date", "BrandOwner", "Brand", "ContentType", "MediaChannel", "AdContacts"]
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = None
 
-    # --- DELETE previous month rows ---
-    period_date = df["Date"].iloc[0]  # assuming all rows have the same Date (previous month)
-    delete_query = f"""
-    DELETE FROM `{table_id}`
-    WHERE Date = '{period_date}'
-    """
-    client.query(delete_query).result()  # execute and wait for completion
+    # Ensure correct types
+    df["Date"] = pd.to_datetime(df["Date"], errors='coerce').dt.strftime("%Y-%m-%d")
+    df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors='coerce').fillna(0).astype(int)
 
-    # Convert to list of dictionaries
     rows_to_insert = df.to_dict(orient="records")
-
-    # Insert in batches
     batch_size = 500
     errors = []
     for i in range(0, len(rows_to_insert), batch_size):
@@ -48,18 +45,27 @@ def push_to_bigquery(df):
     if errors:
         raise RuntimeError(f"BigQuery insert errors: {errors}")
 
-    return f"Deleted previous month rows and streamed {len(df)} rows into {table_id}"
-
+    return f"Streamed {len(df)} rows into {table_id}"
 
 def fetch_adreal_data(request):
-    """Cloud Function entry point: fetch and load AdReal data."""
-    username = access_secret("adreal-username")
-    password = access_secret("adreal-password")
-    parent_brand_ids = ["13549"]
+    """Cloud Function entry point with robust error handling."""
+    try:
+        username = access_secret("adreal-username")
+        password = access_secret("adreal-password")
+        parent_brand_ids = ["13549"]
 
-    df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
-    period = get_correct_period()
+        # Fetch and process data
+        df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
+        print("DataFrame fetched. Shape:", df.shape)
+        print("Columns:", df.columns)
 
-    result = push_to_bigquery(df)
+        period = get_correct_period()
 
-    return f"Data fetched for period {period}: {result}"
+        result = push_to_bigquery(df)
+        return f"Data fetched for period {period}: {result}"
+
+    except Exception as e:
+        # Log full traceback for debugging
+        print("Error occurred:")
+        traceback.print_exc()
+        return f"Error: {str(e)}\n{traceback.format_exc()}"
