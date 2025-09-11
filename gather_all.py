@@ -93,29 +93,37 @@ def get_previous_month_first_day():
 
 
 def clean_data(df):
-    """Clean merged DataFrame."""
-    columns_to_keep = ["Brand owner", "Brand", "Product", "Content type", "Media channel", "Ad contacts", "Date"]
-
+    """Clean merged DataFrame to match BigQuery schema."""
+    # Rename columns to match BQ schema
     df = df.rename(columns={
-        "brand_owner_name": "Brand owner",
+        "brand_owner_name": "BrandOwner",
         "brand_name": "Brand",
-        "website_name": "Media channel",
-        "ad_cont": "Ad contacts",
-        "product": "Product"
+        "website_name": "MediaChannel",
+        "ad_cont": "AdContacts",
+        "product": "Product",           # will drop it anyway
+        "content_type": "ContentType",
+        "Media owner": "MediaOwner",    # if you have this info
+        "Brand owner": "BrandOwner"
     })
 
-    # Drop duplicate content_type if present
-    if "content_type" in df.columns and "Content type" in df.columns:
-        df = df.drop("content_type", axis=1)
+    # Drop the Product column (not in BQ)
+    if "Product" in df.columns:
+        df = df.drop("Product", axis=1)
 
-    # Ensure Content type column exists
-    if "Content type" not in df.columns:
-        df["Content type"] = df["Media channel"].apply(decide_content_type)
+    # Ensure all columns expected by BQ exist
+    expected_columns = ["Date", "BrandOwner", "Brand", "ContentType", "MediaOwner", "MediaChannel", "AdContacts"]
+    for col in expected_columns:
+        if col not in df.columns:
+            df[col] = None  # fill missing columns with None
 
-    # Remove summaries from Product
-    df = df[df["Media channel"] != "Segment summary"]
+    # Remove summaries from MediaChannel
+    df = df[df["MediaChannel"] != "Segment summary"]
+
+    # Set Date to previous month first day
     df['Date'] = get_previous_month_first_day()
-    df = df.reindex(columns=columns_to_keep)
+
+    # Reorder columns to match BigQuery
+    df = df.reindex(columns=expected_columns)
 
     return df
 
