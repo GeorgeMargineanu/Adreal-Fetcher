@@ -64,7 +64,7 @@ def fetch_adreal_data(request):
     try:
         username = access_secret("adreal-username")
         password = access_secret("adreal-password")
-        parent_brand_ids = ["13549"]
+        parent_brand_ids = ["13549","10566"]
 
         # Fetch and process data
         df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
