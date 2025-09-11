@@ -84,11 +84,11 @@ class BrandFetcher:
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     fetcher = BrandFetcher(
-        username="",
-        password="",
+        username = "",
+        password = "",
         market="ro",
     )
     fetcher.login()
     fetcher.fetch_brands(period="month_20250801")
-    #fetcher.save_json("brands.json")
+    fetcher.save_json("brands.json")
     #fetcher.save_csv("brands.csv")

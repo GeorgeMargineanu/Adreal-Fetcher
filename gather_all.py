@@ -83,10 +83,18 @@ def decide_content_type(website):
         return "Social"
     return "Standard"
 
+def get_previous_month_first_day():
+    """Return the first day of the previous month as a string 'YYYY-MM-01'."""
+    today = datetime.today()
+    first_of_current_month = datetime(today.year, today.month, 1)
+    previous_month_last_day = first_of_current_month - timedelta(days=1)
+    previous_month_first_day = datetime(previous_month_last_day.year, previous_month_last_day.month, 1)
+    return previous_month_first_day.strftime('%Y-%m-01')
+
 
 def clean_data(df):
     """Clean merged DataFrame."""
-    columns_to_keep = ["Brand owner", "Brand", "Product", "Content type", "Media channel", "Ad contacts"]
+    columns_to_keep = ["Brand owner", "Brand", "Product", "Content type", "Media channel", "Ad contacts", "Date"]
 
     df = df.rename(columns={
         "brand_owner_name": "Brand owner",
@@ -106,6 +114,7 @@ def clean_data(df):
 
     # Remove summaries from Product
     df = df[df["Media channel"] != "Segment summary"]
+    df['Date'] = get_previous_month_first_day()
     df = df.reindex(columns=columns_to_keep)
 
     return df
