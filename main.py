@@ -1,5 +1,6 @@
 from google.cloud import secretmanager, bigquery
 from gather_all import run_adreal_pipeline, get_correct_period
+import pandas as pd
 
 def access_secret(secret_id, version_id="latest"):
     client = secretmanager.SecretManagerServiceClient()
@@ -9,24 +10,40 @@ def access_secret(secret_id, version_id="latest"):
     return response.payload.data.decode("UTF-8")
 
 def push_to_bigquery(df):
-    """Push the dataframe into BigQuery."""
+    """Stream a DataFrame into BigQuery in batches."""
     client = bigquery.Client()
     table_id = "ums-adreal-471711.Mega.DataImport"
 
-    job_config = bigquery.LoadJobConfig(
-        write_disposition="WRITE_APPEND",  # Append new rows
-    )
+    # Rename columns to match BigQuery schema
+    df = df.rename(columns={
+        "Brand owner": "BrandOwner",
+        "Brand": "Brand",
+        "Product": "Product",
+        "Content type": "ContentType",
+        "Media channel": "MediaChannel",
+        "Ad contacts": "AdContacts",
+    })
 
-    job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
-    job.result()  # Wait until the job completes
+    # Ensure Date is string in YYYY-MM-DD format
+    df["Date"] = pd.to_datetime(df["Date"]).dt.strftime("%Y-%m-%d")
 
-    return f"Loaded {len(df)} rows into {table_id}"
+    # Convert to list of dictionaries
+    rows_to_insert = df.to_dict(orient="records")
+
+    # Insert in batches to avoid memory/API issues
+    batch_size = 500
+    errors = []
+    for i in range(0, len(rows_to_insert), batch_size):
+        batch = rows_to_insert[i:i + batch_size]
+        errors.extend(client.insert_rows_json(table_id, batch))
+
+    if errors:
+        raise RuntimeError(f"BigQuery insert errors: {errors}")
+
+    return f"Streamed {len(df)} rows into {table_id}"
 
 def fetch_adreal_data(request):
-    """
-    Google Cloud Function entry point.
-    Fetches AdReal data, cleans it, and loads into BigQuery.
-    """
+    """Cloud Function entry point: fetch and load AdReal data."""
     username = access_secret("adreal-username")
     password = access_secret("adreal-password")
     parent_brand_ids = ["13549"]
@@ -36,4 +53,4 @@ def fetch_adreal_data(request):
 
     result = push_to_bigquery(df)
 
-    return f"Data fetched for period {period}: {len(df)} rows. {result}"
+    return f"Data fetched for period {period}: {result}"
