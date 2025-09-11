@@ -10,7 +10,7 @@ def access_secret(secret_id, version_id="latest"):
     return response.payload.data.decode("UTF-8")
 
 def push_to_bigquery(df):
-    """Stream a DataFrame into BigQuery in batches."""
+    """Delete previous month rows and stream a DataFrame into BigQuery in batches."""
     client = bigquery.Client()
     table_id = "ums-adreal-471711.Mega.DataImport"
 
@@ -27,10 +27,18 @@ def push_to_bigquery(df):
     # Ensure Date is string in YYYY-MM-DD format
     df["Date"] = pd.to_datetime(df["Date"]).dt.strftime("%Y-%m-%d")
 
+    # --- DELETE previous month rows ---
+    period_date = df["Date"].iloc[0]  # assuming all rows have the same Date (previous month)
+    delete_query = f"""
+    DELETE FROM `{table_id}`
+    WHERE Date = '{period_date}'
+    """
+    client.query(delete_query).result()  # execute and wait for completion
+
     # Convert to list of dictionaries
     rows_to_insert = df.to_dict(orient="records")
 
-    # Insert in batches to avoid memory/API issues
+    # Insert in batches
     batch_size = 500
     errors = []
     for i in range(0, len(rows_to_insert), batch_size):
@@ -40,7 +48,8 @@ def push_to_bigquery(df):
     if errors:
         raise RuntimeError(f"BigQuery insert errors: {errors}")
 
-    return f"Streamed {len(df)} rows into {table_id}"
+    return f"Deleted previous month rows and streamed {len(df)} rows into {table_id}"
+
 
 def fetch_adreal_data(request):
     """Cloud Function entry point: fetch and load AdReal data."""
