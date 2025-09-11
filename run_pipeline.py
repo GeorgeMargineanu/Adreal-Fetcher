@@ -11,7 +11,8 @@ def access_secret(secret_id, version_id="latest"):
 def main():
     username = access_secret("adreal-username")
     password = access_secret("adreal-password")
-    parent_brand_ids = ["13549","10566"]
+    # Mega Competitors
+    parent_brand_ids = ["13549","93773","10566","49673","695","12968","16238","701","688","8196","89922","704","97637","93160"]
 
     df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
     print(f"Data fetched: {len(df)} rows")
