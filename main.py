@@ -4,18 +4,29 @@ import pandas as pd
 import traceback
 
 def access_secret(secret_id, version_id="latest"):
+    """Fetch a secret from Secret Manager."""
     client = secretmanager.SecretManagerServiceClient()
     project_id = "ums-adreal-471711"
     name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
     response = client.access_secret_version(name=name)
     return response.payload.data.decode("UTF-8")
 
+def delete_previous_month(client, table_id, period_date):
+    """Delete rows for a specific month to prevent duplicates."""
+    query = f"""
+    DELETE FROM `{table_id}`
+    WHERE Date = '{period_date}'
+    """
+    print(f"Deleting rows for Date = {period_date} ...")
+    client.query(query).result()
+    print("Deletion complete.")
+
 def push_to_bigquery(df):
-    """Stream a DataFrame into BigQuery in batches, with safety checks."""
+    """Stream a DataFrame into BigQuery in batches."""
     client = bigquery.Client()
     table_id = "ums-adreal-471711.Mega.DataImport"
 
-    # Rename columns to match BQ schema
+    # Rename columns to match BigQuery schema
     df = df.rename(columns={
         "Brand owner": "BrandOwner",
         "Brand": "Brand",
@@ -35,6 +46,7 @@ def push_to_bigquery(df):
     df["Date"] = pd.to_datetime(df["Date"], errors='coerce').dt.strftime("%Y-%m-%d")
     df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors='coerce').fillna(0).astype(int)
 
+    # Insert in batches
     rows_to_insert = df.to_dict(orient="records")
     batch_size = 500
     errors = []
@@ -48,7 +60,7 @@ def push_to_bigquery(df):
     return f"Streamed {len(df)} rows into {table_id}"
 
 def fetch_adreal_data(request):
-    """Cloud Function entry point with robust error handling."""
+    """Cloud Function entry point with pre-delete and robust error handling."""
     try:
         username = access_secret("adreal-username")
         password = access_secret("adreal-password")
@@ -59,13 +71,21 @@ def fetch_adreal_data(request):
         print("DataFrame fetched. Shape:", df.shape)
         print("Columns:", df.columns)
 
-        period = get_correct_period()
+        period_date = pd.to_datetime(get_correct_period()[-8:], format='%Y%m%d').strftime('%Y-%m-01')
 
+        # Initialize BigQuery client
+        client = bigquery.Client()
+        table_id = "ums-adreal-471711.Mega.DataImport"
+
+        # Delete previous month to avoid duplicates
+        delete_previous_month(client, table_id, period_date)
+
+        # Insert fresh data
         result = push_to_bigquery(df)
-        return f"Data fetched for period {period}: {result}"
+
+        return f"Data fetched for period {period_date}: {result}"
 
     except Exception as e:
-        # Log full traceback for debugging
         print("Error occurred:")
         traceback.print_exc()
         return f"Error: {str(e)}\n{traceback.format_exc()}"
