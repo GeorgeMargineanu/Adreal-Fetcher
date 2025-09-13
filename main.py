@@ -13,8 +13,8 @@ def access_secret(secret_id, version_id="latest"):
     return response.payload.data.decode("UTF-8")
 
 
-def push_to_bigquery(df, period_date):
-    """Batch load DataFrame into a specific BigQuery partition (no streaming buffer)."""
+def push_to_bigquery(df):
+    """Load DataFrame into a non-partitioned BigQuery table (overwrite whole table)."""
     client = bigquery.Client()
     table_id = "ums-adreal-471711.Mega.DataImport"
 
@@ -35,18 +35,15 @@ def push_to_bigquery(df, period_date):
             df[col] = None
 
     # Ensure correct types
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date  # keep as Python date
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date  # DATE type
     df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors="coerce").fillna(0).astype(int)
 
-    # Use partition decorator (YYYYMMDD format)
-    partition_id = pd.to_datetime(period_date).strftime("%Y%m%d")
-    table_partition = f"{table_id}${partition_id}"
-
+    # Overwrite the entire table (or use WRITE_APPEND if you only want to add new rows)
     job_config = bigquery.LoadJobConfig(
-        write_disposition="WRITE_TRUNCATE"  # overwrite only that partition
+        write_disposition="WRITE_TRUNCATE"
     )
 
-    load_job = client.load_table_from_dataframe(df, table_partition, job_config=job_config)
+    load_job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
     try:
         load_job.result()  # Wait until the job completes
     except Exception as e:
@@ -54,7 +51,7 @@ def push_to_bigquery(df, period_date):
             print("BigQuery load job errors:", load_job.errors)
         raise e
 
-    return f"Loaded {len(df)} rows into {table_id} for period {period_date}"
+    return f"Loaded {len(df)} rows into {table_id}"
 
 
 def fetch_adreal_data(request):
@@ -74,15 +71,15 @@ def fetch_adreal_data(request):
         print("DataFrame fetched. Shape:", df.shape)
         print("Columns:", df.columns)
 
-        # Get the correct reporting period (first day of the month)
+        # Determine reporting period (for logs only, not used in load)
         period_date = pd.to_datetime(get_correct_period()[-8:], format="%Y%m%d").strftime("%Y-%m-01")
 
-        # Load fresh data into partition
-        result = push_to_bigquery(df, period_date)
+        # Insert data into BigQuery
+        result = push_to_bigquery(df)
 
-        return f"✅ Data fetched for period {period_date}: {result}"
+        return f"Data fetched for period {period_date}: {result}"
 
     except Exception as e:
-        print("❌ Error occurred:")
+        print("Error occurred:")
         traceback.print_exc()
         return f"Error: {str(e)}\n{traceback.format_exc()}"
