@@ -3,20 +3,20 @@ from gather_all import run_adreal_pipeline, get_correct_period
 import pandas as pd
 import traceback
 
+PROJECT_ID = "ums-adreal-471711"
+TABLE_ID = f"{PROJECT_ID}.Mega.DataImport"
 
 def access_secret(secret_id, version_id="latest"):
     """Fetch a secret from Secret Manager."""
     client = secretmanager.SecretManagerServiceClient()
-    project_id = "ums-adreal-471711"
-    name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
+    name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/{version_id}"
     response = client.access_secret_version(name=name)
     return response.payload.data.decode("UTF-8")
 
 
 def push_to_bigquery(df):
-    """Load DataFrame into a non-partitioned BigQuery table (overwrite whole table)."""
+    """Load DataFrame into BigQuery, replacing only the current month(s)."""
     client = bigquery.Client()
-    table_id = "ums-adreal-471711.Mega.DataImport"
 
     # Rename columns to match BigQuery schema
     df = df.rename(columns={
@@ -34,28 +34,34 @@ def push_to_bigquery(df):
         if col not in df.columns:
             df[col] = None
 
-    # Ensure correct types
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date  # DATE type
+    # Correct types
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
     df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors="coerce").fillna(0).astype(int)
 
-    # Overwrite the entire table (or use WRITE_APPEND if you only want to add new rows)
+    # Determine month(s) in the new data
+    months = df["Date"].apply(lambda x: x.replace(day=1)).unique()
+
+    # Delete old rows for these months (partition-aware if table is partitioned)
+    for month in months:
+        delete_query = f"""
+        DELETE FROM `{TABLE_ID}`
+        WHERE EXTRACT(YEAR FROM Date) = {month.year}
+          AND EXTRACT(MONTH FROM Date) = {month.month}
+        """
+        client.query(delete_query).result()
+
+    # Load new data
     job_config = bigquery.LoadJobConfig(
-        write_disposition="WRITE_TRUNCATE"
+        write_disposition="WRITE_APPEND"
     )
+    load_job = client.load_table_from_dataframe(df, TABLE_ID, job_config=job_config)
+    load_job.result()
 
-    load_job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
-    try:
-        load_job.result()  # Wait until the job completes
-    except Exception as e:
-        if load_job.errors:
-            print("BigQuery load job errors:", load_job.errors)
-        raise e
-
-    return f"Loaded {len(df)} rows into {table_id}"
+    return f"Loaded {len(df)} rows into {TABLE_ID} (replacing months: {months})"
 
 
 def fetch_adreal_data(request):
-    """Cloud Function entry point with robust error handling."""
+    """Cloud Function entry point."""
     try:
         username = access_secret("adreal-username")
         password = access_secret("adreal-password")
@@ -71,7 +77,7 @@ def fetch_adreal_data(request):
         print("DataFrame fetched. Shape:", df.shape)
         print("Columns:", df.columns)
 
-        # Determine reporting period (for logs only, not used in load)
+        # Determine reporting period for logs
         period_date = pd.to_datetime(get_correct_period()[-8:], format="%Y%m%d").strftime("%Y-%m-01")
 
         # Insert data into BigQuery
