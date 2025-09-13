@@ -14,7 +14,7 @@ def access_secret(secret_id, version_id="latest"):
 
 
 def push_to_bigquery(df, period_date):
-    """Load a DataFrame into BigQuery, overwriting the target partition."""
+    """Batch load DataFrame into a specific BigQuery partition (no streaming buffer)."""
     client = bigquery.Client()
     table_id = "ums-adreal-471711.Mega.DataImport"
 
@@ -35,32 +35,38 @@ def push_to_bigquery(df, period_date):
             df[col] = None
 
     # Ensure correct types
-    df["Date"] = pd.to_datetime(df["Date"], errors='coerce').dt.strftime("%Y-%m-%d")
-    df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors='coerce').fillna(0).astype(int)
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date  # keep as Python date
+    df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors="coerce").fillna(0).astype(int)
 
-    # Configure load job to overwrite the partition for that Date
+    # Use partition decorator (YYYYMMDD format)
+    partition_id = pd.to_datetime(period_date).strftime("%Y%m%d")
+    table_partition = f"{table_id}${partition_id}"
+
     job_config = bigquery.LoadJobConfig(
-        write_disposition="WRITE_TRUNCATE",
-        time_partitioning=bigquery.TimePartitioning(field="Date")
+        write_disposition="WRITE_TRUNCATE"  # overwrite only that partition
     )
 
-    load_job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
-    load_job.result()  # Wait for the job to complete
+    load_job = client.load_table_from_dataframe(df, table_partition, job_config=job_config)
+    try:
+        load_job.result()  # Wait until the job completes
+    except Exception as e:
+        if load_job.errors:
+            print("BigQuery load job errors:", load_job.errors)
+        raise e
 
     return f"Loaded {len(df)} rows into {table_id} for period {period_date}"
 
 
 def fetch_adreal_data(request):
-    """Cloud Function entry point with partition overwrite and robust error handling."""
+    """Cloud Function entry point with robust error handling."""
     try:
         username = access_secret("adreal-username")
         password = access_secret("adreal-password")
 
         # Mega competitors
         parent_brand_ids = [
-            "13549", "93773", "10566", "49673", "695",
-            "12968", "16238", "701", "688", "8196",
-            "89922", "704", "97637", "93160"
+            "13549", "93773", "10566", "49673", "695", "12968", "16238",
+            "701", "688", "8196", "89922", "704", "97637", "93160"
         ]
 
         # Fetch and process data
@@ -68,15 +74,15 @@ def fetch_adreal_data(request):
         print("DataFrame fetched. Shape:", df.shape)
         print("Columns:", df.columns)
 
-        # Determine correct period (set to first day of month)
-        period_date = pd.to_datetime(get_correct_period()[-8:], format='%Y%m%d').strftime('%Y-%m-01')
+        # Get the correct reporting period (first day of the month)
+        period_date = pd.to_datetime(get_correct_period()[-8:], format="%Y%m%d").strftime("%Y-%m-01")
 
-        # Insert fresh data (overwrites only that partition)
+        # Load fresh data into partition
         result = push_to_bigquery(df, period_date)
 
-        return f"Data fetched for period {period_date}: {result}"
+        return f"✅ Data fetched for period {period_date}: {result}"
 
     except Exception as e:
-        print("Error occurred:")
+        print("❌ Error occurred:")
         traceback.print_exc()
         return f"Error: {str(e)}\n{traceback.format_exc()}"
