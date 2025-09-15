@@ -1,5 +1,5 @@
 from google.cloud import secretmanager, bigquery
-from gather_all import run_adreal_pipeline, get_correct_period
+from common.gather_all import run_adreal_pipeline, get_correct_period
 import pandas as pd
 import traceback
 
