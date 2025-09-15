@@ -27,20 +27,19 @@ def push_to_bigquery(df):
         "Date": "Date"
     })
 
-    # Ensure all required columns exist
-    required_cols = ["Date", "BrandOwner", "Brand", "Product", "ContentType", "MediaChannel", "AdContacts"]
+    # Table Digi.DataImport does NOT have Product
+    required_cols = ["Date", "BrandOwner", "Brand", "ContentType", "MediaChannel", "AdContacts"]
     for col in required_cols:
         if col not in df.columns:
-            df[col] = None  # Fill missing columns with None
+            df[col] = None
 
-    # Keep only required columns in the order expected by BigQuery
+    # Keep only required columns in correct order
     df = df[required_cols]
 
-    # Enforce types compatible with BigQuery
+    # Enforce types
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
     df["BrandOwner"] = df["BrandOwner"].astype(str)
     df["Brand"] = df["Brand"].astype(str)
-    df["Product"] = df["Product"].astype(str)
     df["ContentType"] = df["ContentType"].astype(str)
     df["MediaChannel"] = df["MediaChannel"].astype(str)
     df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors="coerce").fillna(0).astype(int)
@@ -51,10 +50,9 @@ def push_to_bigquery(df):
     if df["Date"].isna().all():
         raise ValueError("All dates are missing; cannot load into BigQuery.")
 
-    # Determine months in the new data
+    # Determine months
     months = df["Date"].apply(lambda x: x.replace(day=1)).unique()
 
-    # Delete old rows for these months
     for month in months:
         delete_query = f"""
         DELETE FROM `{TABLE_ID}`
@@ -64,16 +62,9 @@ def push_to_bigquery(df):
         print(f"Deleting old rows for {month}")
         client.query(delete_query).result()
 
-    # Load new data
     job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
-    try:
-        load_job = client.load_table_from_dataframe(df, TABLE_ID, job_config=job_config)
-        load_job.result()
-        print(f"Loaded {len(df)} rows into {TABLE_ID} (replacing months: {months})")
-    except Exception as e:
-        print("BigQuery load failed:", e)
-        raise
-
+    load_job = client.load_table_from_dataframe(df, TABLE_ID, job_config=job_config)
+    load_job.result()
     return f"Loaded {len(df)} rows into {TABLE_ID} (replacing months: {months})"
 
 def fetch_adreal_data(request):
