@@ -1,6 +1,6 @@
-from brands_fetcher import BrandFetcher
-from websites_fetcher import PublisherFetcher
-from fetch_adreal import AdRealFetcher
+from .brands_fetcher import BrandFetcher
+from .websites_fetcher import PublisherFetcher
+from .fetch_adreal import AdRealFetcher
 import pandas as pd
 from datetime import datetime, timedelta
 
