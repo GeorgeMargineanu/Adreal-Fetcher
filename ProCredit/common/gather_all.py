@@ -46,6 +46,11 @@ def merge_data(stats_data, brands_data, websites_data):
         product_name = brands_lookup.get(segment.get("product"), {}).get("name", segment.get("product"))
         website_name = websites_lookup.get(segment.get("website"), {}).get("name", segment.get("website"))
 
+        product_id = segment.get("product")
+        product_name = None
+        if product_id and product_id in brands_lookup:
+            product_name = brands_lookup[product_id]["name"]
+
         # Use API-provided content_type if available
         content_type = segment.get("content_type")
         if not content_type or content_type == "None":
