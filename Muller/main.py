@@ -68,7 +68,7 @@ def fetch_adreal_data(request):
 
         # Mega competitors
         parent_brand_ids = [
-            ""
+            "94444", "17127", "13367", "157", "51367", "11943", "13339", "12681", "37469", "13343", "17986", "94501", "46544"
         ]
 
         # Fetch and process data
