@@ -13,12 +13,11 @@ def access_secret(secret_id, version_id="latest"):
     response = client.access_secret_version(name=name)
     return response.payload.data.decode("UTF-8")
 
-
 def push_to_bigquery(df):
     """Load DataFrame into BigQuery, replacing only the current month(s)."""
     client = bigquery.Client()
 
-    # Rename columns to match BigQuery schema
+    # Map Muller columns to Mega schema
     df = df.rename(columns={
         "Brand owner": "BrandOwner",
         "Brand": "Brand",
@@ -28,20 +27,28 @@ def push_to_bigquery(df):
         "Ad contacts": "AdContacts",
     })
 
-    # Ensure required columns exist
+    # Ensure all required columns exist
     required_cols = ["Date", "BrandOwner", "Brand", "ContentType", "MediaChannel", "AdContacts", "Product"]
     for col in required_cols:
         if col not in df.columns:
             df[col] = None
 
-    # Correct types
+    # Keep only required columns (drop extra like MediaOwner)
+    df = df[required_cols]
+
+    # Enforce BigQuery-compatible types
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+    df["BrandOwner"] = df["BrandOwner"].astype(str)
+    df["Brand"] = df["Brand"].astype(str)
+    df["Product"] = df["Product"].astype(str)
+    df["ContentType"] = df["ContentType"].astype(str)
+    df["MediaChannel"] = df["MediaChannel"].astype(str)
     df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors="coerce").fillna(0).astype(int)
 
-    # Determine month(s) in the new data
+    # Determine months in the new data
     months = df["Date"].apply(lambda x: x.replace(day=1)).unique()
 
-    # Delete old rows for these months (partition-aware if table is partitioned)
+    # Delete old rows for these months
     for month in months:
         delete_query = f"""
         DELETE FROM `{TABLE_ID}`
@@ -51,14 +58,11 @@ def push_to_bigquery(df):
         client.query(delete_query).result()
 
     # Load new data
-    job_config = bigquery.LoadJobConfig(
-        write_disposition="WRITE_APPEND"
-    )
+    job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
     load_job = client.load_table_from_dataframe(df, TABLE_ID, job_config=job_config)
     load_job.result()
 
     return f"Loaded {len(df)} rows into {TABLE_ID} (replacing months: {months})"
-
 
 def fetch_adreal_data(request):
     """Cloud Function entry point."""
@@ -66,9 +70,10 @@ def fetch_adreal_data(request):
         username = access_secret("adreal-username")
         password = access_secret("adreal-password")
 
-        # Mega competitors
+        # Muller competitors
         parent_brand_ids = [
-            "94444", "17127", "13367", "157", "51367", "11943", "13339", "12681", "37469", "13343", "17986", "94501", "46544"
+            "94444", "17127", "13367", "157", "51367", "11943", "13339",
+            "12681", "37469", "13343", "17986", "94501", "46544"
         ]
 
         # Fetch and process data
