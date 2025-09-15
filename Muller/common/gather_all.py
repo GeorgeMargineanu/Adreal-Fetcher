@@ -122,6 +122,9 @@ def clean_data(df):
     # Set Date to previous month first day
     df['Date'] = get_previous_month_first_day()
 
+    # Force override of ContentType
+    df["ContentType"] = df["MediaChannel"].apply(decide_content_type)
+    
     # Reorder columns to match BigQuery
     df = df.reindex(columns=expected_columns)
 

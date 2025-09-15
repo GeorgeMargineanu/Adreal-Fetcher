@@ -97,8 +97,6 @@ def get_previous_month_first_day():
 
 
 def clean_data(df):
-    """Clean merged DataFrame to match BigQuery schema."""
-    # Rename columns to match BQ schema
     df = df.rename(columns={
         "brand_owner_name": "BrandOwner",
         "brand_name": "Brand",
@@ -106,29 +104,23 @@ def clean_data(df):
         "ad_cont": "AdContacts",
         "product": "Product",           
         "content_type": "ContentType",
-        "Media owner": "MediaOwner",    # if you have this info
+        "Media owner": "MediaOwner",    
         "Brand owner": "BrandOwner"
     })
 
-    # Do NOT drop Product — keep it for BigQuery
-    # if "Product" in df.columns:
-    #     df = df.drop("Product", axis=1)
-
-    # Ensure all columns expected by BQ exist
     expected_columns = ["Date", "BrandOwner", "Brand", "Product", "ContentType", "MediaOwner", "MediaChannel", "AdContacts"]
     for col in expected_columns:
         if col not in df.columns:
-            df[col] = None  # fill missing columns with None
+            df[col] = None
 
-    # Remove summaries from MediaChannel
     df = df[df["MediaChannel"] != "Segment summary"]
 
-    # Set Date to previous month first day
     df['Date'] = get_previous_month_first_day()
 
-    # Reorder columns to match BigQuery
-    df = df.reindex(columns=expected_columns)
+    # Force override of ContentType
+    df["ContentType"] = df["MediaChannel"].apply(decide_content_type)
 
+    df = df.reindex(columns=expected_columns)
     return df
 
 
