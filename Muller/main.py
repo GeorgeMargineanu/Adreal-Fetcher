@@ -28,7 +28,7 @@ def push_to_bigquery(df):
     })
 
     # Ensure all required columns exist
-    required_cols = ["Date", "BrandOwner", "Brand", "ContentType", "MediaChannel", "AdContacts", "Product"]
+    required_cols = ["Date", "BrandOwner", "Brand", "ContentType", "MediaChannel", "AdContacts"]
     for col in required_cols:
         if col not in df.columns:
             df[col] = None
