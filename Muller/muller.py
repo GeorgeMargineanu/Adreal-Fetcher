@@ -1,5 +1,5 @@
 from google.cloud import secretmanager, bigquery
-from gather_all import run_adreal_pipeline, get_correct_period
+from common.gather_all import run_adreal_pipeline, get_correct_period
 import pandas as pd
 import traceback
 
@@ -68,8 +68,7 @@ def fetch_adreal_data(request):
 
         # Mega competitors
         parent_brand_ids = [
-            "13549", "93773", "10566", "49673", "695", "12968", "16238",
-            "701", "688", "8196", "89922", "704", "97637", "93160"
+            ""
         ]
 
         # Fetch and process data
