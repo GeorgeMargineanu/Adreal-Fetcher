@@ -111,12 +111,12 @@ def clean_data(df):
         "Brand owner": "BrandOwner"
     })
 
-    # Drop the Product column (not in BQ)
-    if "Product" in df.columns:
-        df = df.drop("Product", axis=1)
+    # Do NOT drop Product — keep it for BigQuery
+    # if "Product" in df.columns:
+    #     df = df.drop("Product", axis=1)
 
     # Ensure all columns expected by BQ exist
-    expected_columns = ["Date", "BrandOwner", "Brand", "ContentType", "MediaOwner", "MediaChannel", "AdContacts"]
+    expected_columns = ["Date", "BrandOwner", "Brand", "Product", "ContentType", "MediaOwner", "MediaChannel", "AdContacts"]
     for col in expected_columns:
         if col not in df.columns:
             df[col] = None  # fill missing columns with None
