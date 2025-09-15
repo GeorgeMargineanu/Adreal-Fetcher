@@ -4,7 +4,7 @@ import pandas as pd
 import traceback
 
 PROJECT_ID = "ums-adreal-471711"
-TABLE_ID = f"{PROJECT_ID}.ProCredit.DataImport"
+TABLE_ID = f"{PROJECT_ID}.Digi.DataImport"
 
 def access_secret(secret_id, version_id="latest"):
     """Fetch a secret from Secret Manager."""
