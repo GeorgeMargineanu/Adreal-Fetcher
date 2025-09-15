@@ -43,18 +43,16 @@ def merge_data(stats_data, brands_data, websites_data):
         brand_name = brand_info.get("name", brand_id)
         brand_owner_name = get_brand_owner(brand_id, brands_lookup)
 
-        product_name = brands_lookup.get(segment.get("product"), {}).get("name", segment.get("product"))
-        website_name = websites_lookup.get(segment.get("website"), {}).get("name", segment.get("website"))
-
+        # product: set only if the product id exists in brands_lookup, otherwise None
         product_id = segment.get("product")
         product_name = None
         if product_id and product_id in brands_lookup:
-            product_name = brands_lookup[product_id]["name"]
+            product_name = brands_lookup[product_id].get("name")
 
-        # Use API-provided content_type if available
-        content_type = segment.get("content_type")
-        if not content_type or content_type == "None":
-            content_type = decide_content_type(website_name)
+        website_name = websites_lookup.get(segment.get("website"), {}).get("name", segment.get("website"))
+
+        # !!!!!!!Always override ContentType 
+        content_type = decide_content_type(website_name)
 
         for stat in stats_list:
             row = {
@@ -66,15 +64,16 @@ def merge_data(stats_data, brands_data, websites_data):
                 "platform": segment.get("platform", None),
                 "content_type": content_type,
             }
-            # add values
+            # add metric values
             for k, v in stat.get("values", {}).items():
                 row[k] = v
-            # add uncertainty
+            # add uncertainty fields
             for k, v in stat.get("uncertainty", {}).items():
                 row[f"{k}_uncertainty"] = v
             all_rows.append(row)
 
     return all_rows
+
 
 
 def decide_content_type(website):
