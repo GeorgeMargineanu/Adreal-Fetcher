@@ -68,7 +68,7 @@ def fetch_adreal_data(request):
 
         # Mega competitors
         parent_brand_ids = ["13549","93773","10566","49673","695","93648","16238","701","688","8196","89922","704","97637","93728"]
-
+   
         # Fetch and process data
         df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
         print("DataFrame fetched. Shape:", df.shape)
