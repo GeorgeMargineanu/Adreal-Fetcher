@@ -75,7 +75,7 @@ def fetch_adreal_data(request):
 
         # Procredit competitors
         parent_brand_ids = [
-            "16572", "12933", "11936", "12639", "76367"
+            "16571", "12933", "11936", "12639", "76367"
         ]
 
         # Fetch and process data
