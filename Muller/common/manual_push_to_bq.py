@@ -105,6 +105,9 @@ def push_to_bigquery(df, year, month):
 
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
 
+    # Drop columns not in table schema
+    df = df.drop(columns=["MediaOwner"], errors="ignore")
+
     # Delete old rows for the month
     delete_query = f"""
     DELETE FROM `{TABLE_ID}`
