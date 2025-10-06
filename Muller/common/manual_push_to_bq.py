@@ -1,9 +1,12 @@
+# common/manual_push_to_bq.py
+
 import argparse
 from datetime import datetime, timedelta
 import pandas as pd
 import traceback
 import sys
 import os
+from google.cloud import secretmanager, bigquery
 
 # Ensure current directory is in sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,6 +22,15 @@ except ImportError:
         print(f"FATAL: Could not import gather_all.py. Details: {e}")
         sys.exit(1)
 
+PROJECT_ID = "ums-adreal-471711"
+TABLE_ID = f"{PROJECT_ID}.Muller.DataImport"
+
+def access_secret(secret_id, version_id="latest"):
+    """Fetch a secret from GCP Secret Manager."""
+    client = secretmanager.SecretManagerServiceClient()
+    name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/{version_id}"
+    response = client.access_secret_version(name=name)
+    return response.payload.data.decode("UTF-8")
 
 def get_month_range(year, month):
     """Return (start_date, end_date) in YYYYMMDD format for a given month."""
@@ -27,14 +39,12 @@ def get_month_range(year, month):
     end_date = next_month - timedelta(days=next_month.day)
     return start_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d")
 
-
 def get_manual_period_info(year, month):
-    """Return AdReal period string and Date column value for a manual month."""
+    """Return AdReal period string and date string for a manual month."""
     start_date, _ = get_month_range(year, month)
     adreal_period = f"month_{start_date}"
     date_string = datetime(year, month, 1).strftime('%Y-%m-01')
     return adreal_period, date_string
-
 
 def clean_manual_data(df, date_string):
     """Clean and reformat merged DataFrame, forcing the manual date."""
@@ -52,7 +62,6 @@ def clean_manual_data(df, date_string):
         df["AdContacts"] = pd.to_numeric(df["AdContacts"], errors="coerce").fillna(0).astype(int)
     return df
 
-
 def fetch_adreal_manual(username, password, year, month, parent_brand_ids=None, market="ro"):
     """Fetch, merge, clean AdReal data for a manual month."""
     if parent_brand_ids is None:
@@ -61,7 +70,7 @@ def fetch_adreal_manual(username, password, year, month, parent_brand_ids=None, 
     adreal_period, date_string = get_manual_period_info(year, month)
     print(f"Fetching data for period {adreal_period} ({date_string})")
 
-    # 1. Fetch brands & websites
+    # Fetch brands & websites
     brand_fetcher = gather_all.BrandFetcher(username, password, market)
     brand_fetcher.login()
     brands_data = brand_fetcher.fetch_brands(period=adreal_period)
@@ -70,11 +79,9 @@ def fetch_adreal_manual(username, password, year, month, parent_brand_ids=None, 
     publisher_fetcher.login()
     websites_data = publisher_fetcher.fetch_publishers(period=adreal_period)
 
-    # 2. Fetch stats using the same session
+    # Fetch stats
     adreal_fetcher = gather_all.AdRealFetcher(username=username, password=password, market=market)
     adreal_fetcher.login()
-
-    # Compute correct last day of month dynamically
     start, end = get_month_range(year, month)
     adreal_fetcher.period_range = f"{start},{end},month"
     adreal_fetcher.period_label = adreal_fetcher._period_label_from_range(adreal_fetcher.period_range)
@@ -92,41 +99,56 @@ def fetch_adreal_manual(username, password, year, month, parent_brand_ids=None, 
     df = clean_manual_data(df, date_string)
     return df
 
+def push_to_bigquery(df, year, month):
+    """Load DataFrame into BigQuery, replacing only the current month."""
+    client = bigquery.Client()
+
+    df["Date"] = pd.to_datetime(df["Date"]).dt.date
+
+    # Delete old rows for the month
+    delete_query = f"""
+    DELETE FROM `{TABLE_ID}`
+    WHERE EXTRACT(YEAR FROM Date) = {year}
+      AND EXTRACT(MONTH FROM Date) = {month}
+    """
+    print(f"Deleting existing rows for {year}-{month}...")
+    client.query(delete_query).result()
+
+    # Load new rows
+    job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+    load_job = client.load_table_from_dataframe(df, TABLE_ID, job_config=job_config)
+    load_job.result()
+    print(f"Inserted {len(df)} rows into BigQuery for {year}-{month}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Fetch AdReal data for a specific month.")
+    parser = argparse.ArgumentParser(description="Fetch AdReal data for a specific month and push to BigQuery.")
     parser.add_argument("year", type=int, help="Year (e.g., 2025)")
     parser.add_argument("month", type=int, help="Month (1-12)")
     args = parser.parse_args()
 
-    # INSERT your credentials here
-    username = "UnitedRO_Teo.Zamfirescu"
-    password = "TeopassUM25"
-
-    parent_brand_ids = [
-        "94444", "17127", "13367", "157", "51367", "11943", "13339",
-        "12681", "37469", "13343", "17986", "94501", "46544"
-    ]
-
     try:
+        username = access_secret("adreal-username")
+        password = access_secret("adreal-password")
+
+        parent_brand_ids = [
+            "94444", "17127", "13367", "157", "51367", "11943", "13339",
+            "12681", "37469", "13343", "17986", "94501", "46544"
+        ]
+
+        # Fetch AdReal data for the requested month
         df = fetch_adreal_manual(username, password, args.year, args.month, parent_brand_ids=parent_brand_ids)
 
-        print("\n" + "=" * 50)
-        print(f"Data Preview for {args.year}-{args.month}")
-        print(f"DataFrame Shape: {df.shape}")
-        print("=" * 50)
-
         if df.empty:
-            print("No data fetched for this month.")
-        else:
-            print(df.head(10))
-            df.to_csv('test.csv', index=False)
+            print(f"No data for {args.year}-{args.month}. Nothing to push.")
+            return
+
+        print(f"Fetched data for {args.year}-{args.month}, shape: {df.shape}")
+        push_to_bigquery(df, args.year, args.month)
 
     except Exception as e:
         print("FATAL ERROR:")
         traceback.print_exc()
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
