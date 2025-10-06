@@ -119,3 +119,48 @@ python -m common.manual_push_to_bq 2025 8
 > The manual push script (`manual_push_to_bq`) uses a Replace-by-Month ingestion strategy.  
 > Any existing data in the BigQuery destination table for the specified month **WILL BE DELETED** and replaced with new data fetched from the AdReal API.  
 > Use with caution.
+
+---
+
+## 🔐 Setting Up Secrets (AdReal Credentials)
+
+The AdReal Fetcher pipeline uses **Google Secret Manager** to securely store credentials such as the AdReal username and password.  
+Before deploying any new client function, ensure Secret Manager is enabled and the secrets are configured.
+
+### Step 1. Enable Secret Manager API
+
+Run this in **Cloud Shell** or your local terminal:
+
+```bash
+gcloud services enable secretmanager.googleapis.com
+```
+### Step 2. Enable Secret Manager API
+Store your AdReal credentials as secrets in your Google Cloud project.
+
+``` bash
+# Create username secret
+echo -n "USERNAME" | gcloud secrets create adreal-username \
+  --replication-policy="automatic" \
+  --data-file=-
+
+# Create password secret
+echo -n "PASSWORD" | gcloud secrets create adreal-password \
+  --replication-policy="automatic" \
+  --data-file=-
+```
+
+### Step 3. Grant Access to the Cloud Function
+Your Cloud Function runs under a service account (for example:
+ums-adreal-471711@appspot.gserviceaccount.com or a custom one you define).
+
+Grant it permission to access the secrets:
+```bash
+gcloud secrets add-iam-policy-binding adreal-username \
+  --member="serviceAccount:ums-adreal-471711@appspot.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+
+gcloud secrets add-iam-policy-binding adreal-password \
+  --member="serviceAccount:ums-adreal-471711@appspot.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+```
+Once this is done, the Cloud Function can securely retrieve credentials via the SecretManagerServiceClient() class in Python.
