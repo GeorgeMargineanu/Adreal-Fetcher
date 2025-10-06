@@ -38,6 +38,9 @@ def push_to_bigquery(df):
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
     df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors="coerce").fillna(0).astype(int)
 
+    # Drop MediaOwner column
+    df = df.drop(columns=["MediaOwner"], errors="ignore")
+
     # Determine month(s) in the new data
     months = df["Date"].apply(lambda x: x.replace(day=1)).unique()
 
