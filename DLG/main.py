@@ -22,7 +22,7 @@ def push_to_bigquery(df):
     df = df.rename(columns={
         "Brand owner": "BrandOwner",
         "Brand": "Brand",
-        "Product": "Product",
+        "product_label": "Product",
         "Content type": "ContentType",
         "Media channel": "MediaChannel",
         "Ad contacts": "AdContacts",
