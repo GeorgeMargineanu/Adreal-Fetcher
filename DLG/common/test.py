@@ -5,7 +5,7 @@ import time
 import json
 
 class AdRealFetcher:
-    def __init__(self, username, password, market="ro", period_range="20250801,20250831,month",
+    def __init__(self, username, password, market="ro", period_range="20250901,20250930,month",
                  brand_ids=None, limit=10000, max_threads=5, target_metric="ad_cont,ru"):
         self.BASE_URL = "https://adreal.gemius.com/api"
         self.LOGIN_URL = f"{self.BASE_URL}/login/?next=/api/"
@@ -137,8 +137,8 @@ if __name__ == "__main__":
     fetcher = AdRealFetcher(
         username="UnitedRO_Teo.Zamfirescu",
         password="TeopassUM25",
-        brand_ids=[ "89415", "12064", "13256", "13101", "13363", "12619",
-                    "1164", "2991", "26301", "38159", "13311", "12164", "16156" ]
+        brand_ids = ["88685", "96897", "95300", "96128", "96382", "96382", "97321", "97049", "88599", 
+                            "88597", "88586", "53389", "93674", "98190", "97915", "91130", "98006"]
     )
 
     fetcher.login()
