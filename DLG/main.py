@@ -70,7 +70,7 @@ def fetch_adreal_data(request):
         password = access_secret("adreal-password")
 
         # DLG competitors
-        parent_brand_ids = ["93674", "88597", "2531", "1488"]
+        parent_brand_ids = ["93674", "51924", "115", "93962", "1488", "91516", "2531", "96127", "96381", "12687", "2675", "27428"]
    
         # Fetch and process data
         df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
