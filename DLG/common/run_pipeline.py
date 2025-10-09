@@ -12,8 +12,7 @@ def main():
     username = access_secret("adreal-username")
     password = access_secret("adreal-password")
     # DLG Competitors
-    parent_brand_ids = ["88685", "96897", "95300", "96128", "96382", "96382", "97321", "97049", "88599", 
-                            "88597", "88586", "53389", "93674", "98190", "97915", "91130", "98006"]
+    parent_brand_ids = ["13098", "51924", "115", "93962", "1488", "91516", "2531", "96127", "96381", "12687", "2675", "27428"]
    
 
     df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
