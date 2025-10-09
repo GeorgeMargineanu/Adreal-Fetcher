@@ -218,6 +218,8 @@ if __name__ == "__main__":
     support_results = fetcher.fetch_data([brand_to_test], platforms="pc",
                                                  page_types="search,social,standard",
                                                  segments="brand,product,content_type,website", limit=1000000)
+    
+    
     #fetcher.save_json("support_results.json", support_results)
     #fetcher.flatten_to_excel("support_results.xlsx", results=support_results, filter_period=True)
 
