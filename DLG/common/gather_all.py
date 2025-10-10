@@ -96,10 +96,17 @@ def get_previous_month_first_day():
 
 def clean_data(df):
     """Clean merged DataFrame to match BigQuery schema."""
+    
+    # ... (rest of the renames and column checks)
+
+    # Remove the 'period' column, as BigQuery uses 'Date' instead.
+    if 'period' in df.columns:
+        df = df.drop(columns=['period'])
+
     df = df.rename(columns={
         "brand_owner_name": "BrandOwner",
         "brand_name": "Brand",
-        "product_label": "Product",         # <-- keep product
+        "product_label": "Product",
         "website_name": "MediaChannel",
         "ad_cont": "AdContacts",
         "content_type": "ContentType",
@@ -117,11 +124,8 @@ def clean_data(df):
     # Set Date to previous month first day
     df['Date'] = get_previous_month_first_day()
 
-    # Force ContentType using MediaChannel
-    #df["ContentType"] = df["MediaChannel"].apply(decide_content_type)
-
     # Reorder columns to match BigQuery
-    #df = df.reindex(columns=expected_columns)
+    #df = df.reindex(columns=expected_columns) # Reindexing is optional here
     return df
 
 def get_correct_period():
