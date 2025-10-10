@@ -45,7 +45,7 @@ def merge_data(stats_data, brands_data, websites_data):
         if "product" in segment:
             if isinstance(segment["product"], dict):
                 product_id = segment["product"].get("id")
-                product_name = segment["product"].get("label")  # API returns label here
+                product_name = segment["product"].get("label") # API returns label here
             else:
                 product_id = segment["product"]
                 product_name = brands_lookup.get(product_id, {}).get("name", product_id)
@@ -53,15 +53,16 @@ def merge_data(stats_data, brands_data, websites_data):
         website_name = websites_lookup.get(segment.get("website"), {}).get("name", segment.get("website"))
 
         content_type = segment.get("content_type")
+        # Ensure we use the API's content type unless it's genuinely missing
         if not content_type or content_type == "None":
-            content_type = decide_content_type(website_name)
+            content_type = decide_content_type(website_name) # Fallback to URL check
 
         for stat in stats_list:
             row = {
                 "period": stat.get("period"),
                 "brand_owner_name": brand_owner_name,
                 "brand_name": brand_name,
-                "product_label": product_name,   # <-- use product_label to match BigQuery
+                "product_label": product_name,  # <-- use product_label
                 "website_name": website_name,
                 "platform": segment.get("platform", None),
                 "content_type": content_type,
@@ -96,13 +97,7 @@ def get_previous_month_first_day():
 
 def clean_data(df):
     """Clean merged DataFrame to match BigQuery schema."""
-    
-    # ... (rest of the renames and column checks)
-
-    # Remove the 'period' column, as BigQuery uses 'Date' instead.
-    if 'period' in df.columns:
-        df = df.drop(columns=['period'])
-
+    # 1. Rename columns to match BQ schema
     df = df.rename(columns={
         "brand_owner_name": "BrandOwner",
         "brand_name": "Brand",
@@ -112,20 +107,27 @@ def clean_data(df):
         "content_type": "ContentType",
     })
 
-    # Ensure all columns expected by BQ exist
+    # 2. Define expected columns
     expected_columns = ["Date", "BrandOwner", "Brand", "Product", "ContentType", "MediaChannel", "AdContacts"]
+    
+    # 3. Ensure expected columns exist
     for col in expected_columns:
         if col not in df.columns:
             df[col] = None
 
-    # Remove summaries from MediaChannel
+    # 4. Remove summaries from MediaChannel
     df = df[df["MediaChannel"] != "Segment summary"]
 
-    # Set Date to previous month first day
+    # 5. Set Date to previous month first day
     df['Date'] = get_previous_month_first_day()
 
-    # Reorder columns to match BigQuery
-    #df = df.reindex(columns=expected_columns) # Reindexing is optional here
+    # ❌ FIX: REMOVED THE LINE that overwrites ContentType
+    # df["ContentType"] = df["MediaChannel"].apply(decide_content_type)
+    # The 'ContentType' now preserves the more specific value from the API/merge_data.
+
+    # 6. Reorder columns and enforce BQ schema by selecting only expected columns.
+    df = df.reindex(columns=expected_columns) # ✅ FIX: UNCOMMENTED to fix the BQ schema error
+    
     return df
 
 def get_correct_period():
