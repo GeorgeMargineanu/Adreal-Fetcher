@@ -8,39 +8,28 @@ def return_lookup(data):
     """Helper: build id -> full brand/publisher info dict."""
     return {dat["id"]: dat for dat in data}
 
+
 def get_brand_owner(brand_id, brands_lookup):
     """
-    [FIXED] Given a brand ID, find the top-level Brand owner by recursively 
-    traversing the parent hierarchy. The previous non-recursive logic was 
-    the likely cause of incorrect data aggregation/grouping.
+    Given a brand ID, find the top-level Brand owner.
     """
-    current_id = brand_id
-    owner_name = None
-    
-    # Traverse up the brand hierarchy until the top is reached (no parent_id)
-    while current_id:
-        brand_info = brands_lookup.get(current_id)
-        if not brand_info:
-            # If the ID is invalid, stop and return the last valid name found (or None)
-            return owner_name 
-        
-        # Store the current name as the potential owner. This name will be the top-most 
-        # when the loop terminates.
-        owner_name = brand_info.get("name")
-        
-        parent_id = brand_info.get("parent_id")
-        
-        if not parent_id:
-            # We hit the top level (no parent_id defined), so owner_name is the true owner.
-            return owner_name
-        
-        # Move up to the parent level for the next iteration
-        current_id = parent_id
+    brand_info = brands_lookup.get(brand_id)
+    if not brand_info:
+        return None  # brand not found
 
-    return owner_name
+    parent_id = brand_info.get("parent_id")
+    if not parent_id:
+        return brand_info["name"]  # already a top-level owner
+
+    parent_info = brands_lookup.get(parent_id)
+    if not parent_info:
+        return None  # parent not found
+
+    return parent_info["name"]
+
 
 def merge_data(stats_data, brands_data, websites_data):
-    """Merge stats + brand + websites lookups, filling Brand owner & Product properly."""
+    """Merge stats + brand + websites lookups, filling Brand owner properly."""
     brands_lookup = return_lookup(brands_data)
     websites_lookup = return_lookup(websites_data)
 
@@ -52,34 +41,22 @@ def merge_data(stats_data, brands_data, websites_data):
         brand_id = segment.get("brand")
         brand_info = brands_lookup.get(brand_id, {})
         brand_name = brand_info.get("name", brand_id)
-        
-        # Use the fixed, recursive function to find the true Brand Owner
-        brand_owner_name = get_brand_owner(brand_id, brands_lookup) 
+        brand_owner_name = get_brand_owner(brand_id, brands_lookup)
 
-        # FIX: get Product safely from segment dict
-        product_id = None
-        product_name = None
-        if "product" in segment:
-            if isinstance(segment["product"], dict):
-                product_id = segment["product"].get("id")
-                product_name = segment["product"].get("label") # API returns label here
-            else:
-                product_id = segment["product"]
-                product_name = brands_lookup.get(product_id, {}).get("name", product_id)
-
+        product_name = brands_lookup.get(segment.get("product"), {}).get("name", segment.get("product"))
         website_name = websites_lookup.get(segment.get("website"), {}).get("name", segment.get("website"))
 
+        # Use API-provided content_type if available
         content_type = segment.get("content_type")
-        # Ensure we use the API's content type unless it's genuinely missing
         if not content_type or content_type == "None":
-            content_type = decide_content_type(website_name) # Fallback to URL check
+            content_type = decide_content_type(website_name)
 
         for stat in stats_list:
             row = {
                 "period": stat.get("period"),
                 "brand_owner_name": brand_owner_name,
                 "brand_name": brand_name,
-                "product_label": product_name, 
+                "product": product_name,
                 "website_name": website_name,
                 "platform": segment.get("platform", None),
                 "content_type": content_type,
@@ -94,6 +71,7 @@ def merge_data(stats_data, brands_data, websites_data):
 
     return all_rows
 
+
 def decide_content_type(website):
     """Fallback if API doesn't provide content_type."""
     if not isinstance(website, str) or not website:
@@ -106,54 +84,61 @@ def decide_content_type(website):
     return "Standard"
 
 def get_previous_month_first_day():
+    """Return the first day of the previous month as a string 'YYYY-MM-01'."""
     today = datetime.today()
     first_of_current_month = datetime(today.year, today.month, 1)
     previous_month_last_day = first_of_current_month - timedelta(days=1)
     previous_month_first_day = datetime(previous_month_last_day.year, previous_month_last_day.month, 1)
     return previous_month_first_day.strftime('%Y-%m-01')
 
+
 def clean_data(df):
     """Clean merged DataFrame to match BigQuery schema."""
-    # 1. Rename columns to match BQ schema
+    # Rename columns to match BQ schema
     df = df.rename(columns={
         "brand_owner_name": "BrandOwner",
         "brand_name": "Brand",
-        "product_label": "Product",
         "website_name": "MediaChannel",
         "ad_cont": "AdContacts",
+        "product": "Product",           # will drop it anyway
         "content_type": "ContentType",
+        "Media owner": "MediaOwner",    # if you have this info
+        "Brand owner": "BrandOwner"
     })
 
-    # 2. Define expected columns
-    expected_columns = ["Date", "BrandOwner", "Brand", "Product", "ContentType", "MediaChannel", "AdContacts"]
-    
-    # 3. Ensure expected columns exist
+    # Drop the Product column (not in BQ)
+    if "Product" in df.columns:
+        df = df.drop("Product", axis=1)
+
+    # Ensure all columns expected by BQ exist
+    expected_columns = ["Date", "BrandOwner", "Brand", "ContentType", "MediaOwner", "MediaChannel", "AdContacts"]
     for col in expected_columns:
         if col not in df.columns:
-            df[col] = None
+            df[col] = None  # fill missing columns with None
 
-    # 4. Remove summaries from MediaChannel
+    # Remove summaries from MediaChannel
     df = df[df["MediaChannel"] != "Segment summary"]
 
-    # 5. [Removed the unwanted product filter] - The recursive Brand Owner logic should handle correct grouping.
-
-    # 6. Set Date to previous month first day
+    # Set Date to previous month first day
     df['Date'] = get_previous_month_first_day()
 
-    # 7. Force ContentType using MediaChannel (Keeping this consistent with the old version)
+    # Force override of ContentType
     df["ContentType"] = df["MediaChannel"].apply(decide_content_type)
-
-    # 8. Reorder columns and enforce BQ schema by selecting only expected columns.
-    df = df.reindex(columns=expected_columns) 
     
+    # Reorder columns to match BigQuery
+    df = df.reindex(columns=expected_columns)
+
     return df
 
+
 def get_correct_period():
+    """Return the previous month in AdReal API period format."""
     today = datetime.today()
     first_of_current_month = datetime(today.year, today.month, 1)
     previous_month_last_day = first_of_current_month - timedelta(days=1)
     period = f"month_{previous_month_last_day.strftime('%Y%m01')}"
     return period
+
 
 def run_adreal_pipeline(username, password, market="ro", parent_brand_ids=None):
     """Fetch, merge, clean AdReal data and return a DataFrame."""
