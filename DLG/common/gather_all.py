@@ -10,8 +10,9 @@ def return_lookup(data):
 
 def get_brand_owner(brand_id, brands_lookup):
     """
-    Given a brand ID, find the top-level Brand owner by recursively 
-    traversing the parent hierarchy. (FIXED LOGIC)
+    [FIXED] Given a brand ID, find the top-level Brand owner by recursively 
+    traversing the parent hierarchy. The previous non-recursive logic was 
+    the likely cause of incorrect data aggregation/grouping.
     """
     current_id = brand_id
     owner_name = None
@@ -52,7 +53,7 @@ def merge_data(stats_data, brands_data, websites_data):
         brand_info = brands_lookup.get(brand_id, {})
         brand_name = brand_info.get("name", brand_id)
         
-        # Use the newly fixed, recursive function to find the true Brand Owner
+        # Use the fixed, recursive function to find the true Brand Owner
         brand_owner_name = get_brand_owner(brand_id, brands_lookup) 
 
         # FIX: get Product safely from segment dict
@@ -78,7 +79,7 @@ def merge_data(stats_data, brands_data, websites_data):
                 "period": stat.get("period"),
                 "brand_owner_name": brand_owner_name,
                 "brand_name": brand_name,
-                "product_label": product_name, # <-- use product_label
+                "product_label": product_name, 
                 "website_name": website_name,
                 "platform": segment.get("platform", None),
                 "content_type": content_type,
@@ -134,13 +135,15 @@ def clean_data(df):
     # 4. Remove summaries from MediaChannel
     df = df[df["MediaChannel"] != "Segment summary"]
 
-    # 5. Set Date to previous month first day
+    # 5. [Removed the unwanted product filter] - The recursive Brand Owner logic should handle correct grouping.
+
+    # 6. Set Date to previous month first day
     df['Date'] = get_previous_month_first_day()
 
-    # 6. ContentType is kept as is from merge_data, preserving API detail (no overwrite here).
+    # 7. Force ContentType using MediaChannel (Keeping this consistent with the old version)
+    df["ContentType"] = df["MediaChannel"].apply(decide_content_type)
 
-    # 7. Reorder columns and enforce BQ schema by selecting only expected columns.
-    # This successfully removes 'period', 'platform', and 'uncertainty' columns.
+    # 8. Reorder columns and enforce BQ schema by selecting only expected columns.
     df = df.reindex(columns=expected_columns) 
     
     return df

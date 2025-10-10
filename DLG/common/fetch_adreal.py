@@ -161,39 +161,3 @@ class AdRealFetcher:
     def save_json(self, filename, data=None):
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(data or self.all_results, f, indent=4, ensure_ascii=False)
-
-    def flatten_to_excel(self, filename, results=None, filter_period=True):
-        """
-        Flatten results -> excel. If filter_period True, only keep stats rows
-        whose 'period' equals the requested period_label (avoids duplicates).
-        """
-        results = results if results is not None else self.all_results
-        all_rows = []
-        for item in results:
-            seg_info = item.get("segment", {})
-
-            row = {}
-            for seg_type, seg_values in seg_info.items():
-                if isinstance(seg_values, dict):
-                    for k, v in seg_values.items():
-                        row[f"{seg_type}_{k}"] = v
-                else:
-                    row[seg_type] = seg_values
-
-            for stat in item.get("stats", []):
-                if filter_period and self.period_label:
-                    if stat.get("period") != self.period_label:
-                        # skip other stats entries (otherwise will see 3x duplicates)
-                        continue
-                row_copy = row.copy()
-                row_copy["period"] = stat.get("period")
-                for k, v in stat.get("values", {}).items():
-                    row_copy[k] = v
-                for k, v in stat.get("uncertainty", {}).items():
-                    row_copy[f"{k}_uncertainty"] = v
-                all_rows.append(row_copy)
-
-        df = pd.DataFrame(all_rows)
-        df.to_excel(filename, index=False)
-        print(f"Saved {len(df)} rows to {filename}")
-        return df
