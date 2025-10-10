@@ -83,7 +83,11 @@ def fetch_adreal_data(request):
         password = access_secret("adreal-password")
 
         # Muller competitors
-        parent_brand_ids = ["95300", "91130", "98190", "88586", "53389", "96897", "88685"]
+        parent_brand_ids = ["95300", "91130", "98190", "88586", "53389", "96897", "88685" # Braun
+                            "93674", "88597", "2531", "1488", # DeLonghi
+                            "91516", "98190", "98006", "27428", "13098", # Kenwood
+                            "96381", "96128", "88599", "97049", "97915", "98190", "98115", "93961", "53389" # Nutribullet
+                            ]
 
         # Fetch and process data
         df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
