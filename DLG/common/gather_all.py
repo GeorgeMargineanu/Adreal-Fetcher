@@ -9,20 +9,34 @@ def return_lookup(data):
     return {dat["id"]: dat for dat in data}
 
 def get_brand_owner(brand_id, brands_lookup):
-    """Given a brand ID, find the top-level Brand owner."""
-    brand_info = brands_lookup.get(brand_id)
-    if not brand_info:
-        return None
+    """
+    Given a brand ID, find the top-level Brand owner by recursively 
+    traversing the parent hierarchy. (FIXED LOGIC)
+    """
+    current_id = brand_id
+    owner_name = None
+    
+    # Traverse up the brand hierarchy until the top is reached (no parent_id)
+    while current_id:
+        brand_info = brands_lookup.get(current_id)
+        if not brand_info:
+            # If the ID is invalid, stop and return the last valid name found (or None)
+            return owner_name 
+        
+        # Store the current name as the potential owner. This name will be the top-most 
+        # when the loop terminates.
+        owner_name = brand_info.get("name")
+        
+        parent_id = brand_info.get("parent_id")
+        
+        if not parent_id:
+            # We hit the top level (no parent_id defined), so owner_name is the true owner.
+            return owner_name
+        
+        # Move up to the parent level for the next iteration
+        current_id = parent_id
 
-    parent_id = brand_info.get("parent_id")
-    if not parent_id:
-        return brand_info.get("name")
-
-    parent_info = brands_lookup.get(parent_id)
-    if not parent_info:
-        return None
-
-    return parent_info.get("name")
+    return owner_name
 
 def merge_data(stats_data, brands_data, websites_data):
     """Merge stats + brand + websites lookups, filling Brand owner & Product properly."""
@@ -37,7 +51,9 @@ def merge_data(stats_data, brands_data, websites_data):
         brand_id = segment.get("brand")
         brand_info = brands_lookup.get(brand_id, {})
         brand_name = brand_info.get("name", brand_id)
-        brand_owner_name = get_brand_owner(brand_id, brands_lookup)
+        
+        # Use the newly fixed, recursive function to find the true Brand Owner
+        brand_owner_name = get_brand_owner(brand_id, brands_lookup) 
 
         # FIX: get Product safely from segment dict
         product_id = None
@@ -62,7 +78,7 @@ def merge_data(stats_data, brands_data, websites_data):
                 "period": stat.get("period"),
                 "brand_owner_name": brand_owner_name,
                 "brand_name": brand_name,
-                "product_label": product_name,  # <-- use product_label
+                "product_label": product_name, # <-- use product_label
                 "website_name": website_name,
                 "platform": segment.get("platform", None),
                 "content_type": content_type,
@@ -121,12 +137,11 @@ def clean_data(df):
     # 5. Set Date to previous month first day
     df['Date'] = get_previous_month_first_day()
 
-    # ❌ FIX: REMOVED THE LINE that overwrites ContentType
-    # df["ContentType"] = df["MediaChannel"].apply(decide_content_type)
-    # The 'ContentType' now preserves the more specific value from the API/merge_data.
+    # 6. ContentType is kept as is from merge_data, preserving API detail (no overwrite here).
 
-    # 6. Reorder columns and enforce BQ schema by selecting only expected columns.
-    df = df.reindex(columns=expected_columns) # ✅ FIX: UNCOMMENTED to fix the BQ schema error
+    # 7. Reorder columns and enforce BQ schema by selecting only expected columns.
+    # This successfully removes 'period', 'platform', and 'uncertainty' columns.
+    df = df.reindex(columns=expected_columns) 
     
     return df
 
