@@ -7,19 +7,3 @@ def access_secret(secret_id, version_id="latest"):
     name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
     response = client.access_secret_version(name=name)
     return response.payload.data.decode("UTF-8")
-
-def main():
-    username = access_secret("adreal-username")
-    password = access_secret("adreal-password")
-    # DLG Competitors
-    parent_brand_ids = ["13098", "51924", "115", "93962", "1488", "91516", "2531", "96127", "96381", "12687", "2675", "27428"]
-   
-
-    df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
-    print(f"Data fetched: {len(df)} rows")
-
-    period = get_correct_period()
-    df.to_csv(f"{period}_Adreal.csv", index=False)
-
-if __name__ == "__main__":
-    main()

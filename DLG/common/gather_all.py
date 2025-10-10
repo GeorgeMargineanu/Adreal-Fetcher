@@ -118,10 +118,10 @@ def clean_data(df):
     df['Date'] = get_previous_month_first_day()
 
     # Force ContentType using MediaChannel
-    df["ContentType"] = df["MediaChannel"].apply(decide_content_type)
+    #df["ContentType"] = df["MediaChannel"].apply(decide_content_type)
 
     # Reorder columns to match BigQuery
-    df = df.reindex(columns=expected_columns)
+    #df = df.reindex(columns=expected_columns)
     return df
 
 def get_correct_period():

@@ -197,31 +197,3 @@ class AdRealFetcher:
         df.to_excel(filename, index=False)
         print(f"Saved {len(df)} rows to {filename}")
         return df
-
-# ---------------- MAIN DEMO ----------------
-if __name__ == "__main__":
-    start_time = time.time()
-
-    USERNAME = ""
-    PASSWORD = ""
-
-    fetcher = AdRealFetcher(username=USERNAME, password=PASSWORD, brand_ids="13549")
-
-    # login using your session method
-    fetcher.login()
-
-    # list platforms so you can see what 'pc' corresponds to (id/code)
-    platforms = fetcher.list_platforms()
-
-    # try support-style query for Dream&co (95638)
-    brand_to_test = 13549
-    support_results = fetcher.fetch_data([brand_to_test], platforms="pc",
-                                                 page_types="search,social,standard",
-                                                 segments="brand,product,content_type,website", limit=1000000)
-    
-    
-    #fetcher.save_json("support_results.json", support_results)
-    #fetcher.flatten_to_excel("support_results.xlsx", results=support_results, filter_period=True)
-
-    end_time = time.time()
-    print(f"Done in {round((end_time - start_time)/60, 2)} minutes")
