@@ -13,52 +13,68 @@ def access_secret(secret_id, version_id="latest"):
     response = client.access_secret_version(name=name)
     return response.payload.data.decode("UTF-8")
 
-
 def push_to_bigquery(df):
     """Load DataFrame into BigQuery, replacing only the current month(s)."""
     client = bigquery.Client()
 
-    # Rename columns to match BigQuery schema
+    # Map Muller columns to BigQuery schema
     df = df.rename(columns={
         "Brand owner": "BrandOwner",
         "Brand": "Brand",
-        "Product": "Product",
         "Content type": "ContentType",
         "Media channel": "MediaChannel",
         "Ad contacts": "AdContacts",
+        "Date": "Date"
     })
 
-    # Ensure required columns exist
-    required_cols = ["Date", "BrandOwner", "Brand", "ContentType", "MediaChannel", "AdContacts"]
+    # Ensure all required columns exist
+    required_cols = ["Date", "BrandOwner", "Brand", "Product", "ContentType", "MediaChannel", "AdContacts"]
     for col in required_cols:
         if col not in df.columns:
-            df[col] = None
+            df[col] = None  # Fill missing columns with None
 
-    # Correct types
+    # Keep only required columns in the order expected by BigQuery
+    df = df[required_cols]
+
+    # Enforce types compatible with BigQuery
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+    df["BrandOwner"] = df["BrandOwner"].astype(str)
+    df["Brand"] = df["Brand"].astype(str)
+    df["Product"] = df["Product"].astype(str)
+    df["ContentType"] = df["ContentType"].astype(str)
+    df["MediaChannel"] = df["MediaChannel"].astype(str)
     df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors="coerce").fillna(0).astype(int)
 
-    # Determine month(s) in the new data
+    print("Preview of data to load:")
+    print(df.head())
+
+    if df["Date"].isna().all():
+        raise ValueError("All dates are missing; cannot load into BigQuery.")
+
+    # Determine months in the new data
     months = df["Date"].apply(lambda x: x.replace(day=1)).unique()
 
-    # Delete old rows for these months (partition-aware if table is partitioned)
+    # Delete old rows for these months
     for month in months:
         delete_query = f"""
         DELETE FROM `{TABLE_ID}`
         WHERE EXTRACT(YEAR FROM Date) = {month.year}
           AND EXTRACT(MONTH FROM Date) = {month.month}
         """
+        print(f"Deleting old rows for {month}")
         client.query(delete_query).result()
 
     # Load new data
-    job_config = bigquery.LoadJobConfig(
-        write_disposition="WRITE_APPEND"
-    )
-    load_job = client.load_table_from_dataframe(df, TABLE_ID, job_config=job_config)
-    load_job.result()
+    job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
+    try:
+        load_job = client.load_table_from_dataframe(df, TABLE_ID, job_config=job_config)
+        load_job.result()
+        print(f"Loaded {len(df)} rows into {TABLE_ID} (replacing months: {months})")
+    except Exception as e:
+        print("BigQuery load failed:", e)
+        raise
 
     return f"Loaded {len(df)} rows into {TABLE_ID} (replacing months: {months})"
-
 
 def fetch_adreal_data(request):
     """Cloud Function entry point."""
@@ -66,11 +82,11 @@ def fetch_adreal_data(request):
         username = access_secret("adreal-username")
         password = access_secret("adreal-password")
 
-        # Mega competitors
+        # Muller competitors
         parent_brand_ids = [
             "94444", "17127", "13367", "51367", "11943", "13339", "12681", "37469", "13343", "17986", "94501"
         ]
-   
+
         # Fetch and process data
         df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
         print("DataFrame fetched. Shape:", df.shape)

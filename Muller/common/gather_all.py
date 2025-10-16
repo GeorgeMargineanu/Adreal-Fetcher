@@ -124,6 +124,7 @@ def clean_data(df):
 
     # Force override of ContentType
     df["ContentType"] = df["MediaChannel"].apply(decide_content_type)
+    
     # Reorder columns to match BigQuery
     df = df.reindex(columns=expected_columns)
 
