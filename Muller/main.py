@@ -4,7 +4,7 @@ import pandas as pd
 import traceback
 
 PROJECT_ID = "ums-adreal-471711"
-TABLE_ID = f"{PROJECT_ID}.Digi.DataImport"
+TABLE_ID = f"{PROJECT_ID}.Muller.DataImport"
 
 def access_secret(secret_id, version_id="latest"):
     """Fetch a secret from Secret Manager."""
@@ -27,7 +27,7 @@ def push_to_bigquery(df):
         "Date": "Date"
     })
 
-    # Table Digi.DataImport does NOT have Product
+    # Table Muller.DataImport does NOT have Product
     required_cols = ["Date", "BrandOwner", "Brand", "ContentType", "MediaChannel", "AdContacts"]
     for col in required_cols:
         if col not in df.columns:
