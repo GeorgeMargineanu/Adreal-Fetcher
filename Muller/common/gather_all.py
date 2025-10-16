@@ -11,7 +11,7 @@ def return_lookup(data):
 
 def get_brand_owner(brand_id, brands_lookup):
     """
-    Given a brand ID, find the top-level Brand owner.f
+    Given a brand ID, find the top-level Brand owner.
     """
     brand_info = brands_lookup.get(brand_id)
     if not brand_info:
@@ -43,16 +43,13 @@ def merge_data(stats_data, brands_data, websites_data):
         brand_name = brand_info.get("name", brand_id)
         brand_owner_name = get_brand_owner(brand_id, brands_lookup)
 
-        # product: set only if the product id exists in brands_lookup, otherwise None
-        product_id = segment.get("product")
-        product_name = None
-        if product_id and product_id in brands_lookup:
-            product_name = brands_lookup[product_id].get("name")
-
+        product_name = brands_lookup.get(segment.get("product"), {}).get("name", segment.get("product"))
         website_name = websites_lookup.get(segment.get("website"), {}).get("name", segment.get("website"))
 
-        # !!!!!!!Always override ContentType 
-        content_type = decide_content_type(website_name)
+        # Use API-provided content_type if available
+        content_type = segment.get("content_type")
+        if not content_type or content_type == "None":
+            content_type = decide_content_type(website_name)
 
         for stat in stats_list:
             row = {
@@ -64,16 +61,15 @@ def merge_data(stats_data, brands_data, websites_data):
                 "platform": segment.get("platform", None),
                 "content_type": content_type,
             }
-            # add metric values
+            # add values
             for k, v in stat.get("values", {}).items():
                 row[k] = v
-            # add uncertainty fields
+            # add uncertainty
             for k, v in stat.get("uncertainty", {}).items():
                 row[f"{k}_uncertainty"] = v
             all_rows.append(row)
 
     return all_rows
-
 
 
 def decide_content_type(website):
@@ -97,30 +93,40 @@ def get_previous_month_first_day():
 
 
 def clean_data(df):
+    """Clean merged DataFrame to match BigQuery schema."""
+    # Rename columns to match BQ schema
     df = df.rename(columns={
         "brand_owner_name": "BrandOwner",
         "brand_name": "Brand",
         "website_name": "MediaChannel",
         "ad_cont": "AdContacts",
-        "product": "Product",           
+        "product": "Product",           # will drop it anyway
         "content_type": "ContentType",
-        "Media owner": "MediaOwner",    
+        "Media owner": "MediaOwner",    # if you have this info
         "Brand owner": "BrandOwner"
     })
 
-    expected_columns = ["Date", "BrandOwner", "Brand", "Product", "ContentType", "MediaOwner", "MediaChannel", "AdContacts"]
+    # Drop the Product column (not in BQ)
+    if "Product" in df.columns:
+        df = df.drop("Product", axis=1)
+
+    # Ensure all columns expected by BQ exist
+    expected_columns = ["Date", "BrandOwner", "Brand", "ContentType", "MediaOwner", "MediaChannel", "AdContacts"]
     for col in expected_columns:
         if col not in df.columns:
-            df[col] = None
+            df[col] = None  # fill missing columns with None
 
+    # Remove summaries from MediaChannel
     df = df[df["MediaChannel"] != "Segment summary"]
 
+    # Set Date to previous month first day
     df['Date'] = get_previous_month_first_day()
 
     # Force override of ContentType
     df["ContentType"] = df["MediaChannel"].apply(decide_content_type)
-
+    # Reorder columns to match BigQuery
     df = df.reindex(columns=expected_columns)
+
     return df
 
 

@@ -11,7 +11,7 @@ def access_secret(secret_id, version_id="latest"):
 def main():
     username = access_secret("adreal-username")
     password = access_secret("adreal-password")
-    # ProCredit Competitors
+    # Mega Competitors
     parent_brand_ids = [
             "94444", "17127", "13367", "51367", "11943", "13339", "12681", "37469", "13343", "17986", "94501"
         ]

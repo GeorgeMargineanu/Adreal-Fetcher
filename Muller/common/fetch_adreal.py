@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 
 class AdRealFetcher:
     def __init__(self, username, password, market="ro",
-                 period_range="20250801,20250831,month",
+                 period_range="20250901,20250931,month",
                  brand_ids="", limit=10000, max_threads=5, target_metric="ad_cont,ru"):
         self.BASE_URL = "https://adreal.gemius.com/api"
         self.LOGIN_URL = f"{self.BASE_URL}/login/?next=/api/"
