@@ -129,6 +129,16 @@ def clean_data(df):
 
     return df
 
+def get_previous_month_range():
+    """Return previous month in AdReal API range format (YYYYMM01,YYYYMMDD,month)."""
+    today = datetime.today()
+    first_of_current_month = datetime(today.year, today.month, 1)
+    previous_month_last_day = first_of_current_month - timedelta(days=1)
+    first_of_previous_month = datetime(previous_month_last_day.year, previous_month_last_day.month, 1)
+
+    start_str = first_of_previous_month.strftime("%Y%m%d")
+    end_str = previous_month_last_day.strftime("%Y%m%d")
+    return f"{start_str},{end_str},month"
 
 def get_correct_period():
     """Return the previous month in AdReal API period format."""
@@ -155,8 +165,10 @@ def run_adreal_pipeline(username, password, market="ro", parent_brand_ids=None):
     publisher_fetcher.login()
     websites_data = publisher_fetcher.fetch_publishers(period=period)
 
+    period_range = get_previous_month_range()
+
     # Fetch stats
-    adreal_fetcher = AdRealFetcher(username=username, password=password, market=market)
+    adreal_fetcher = AdRealFetcher(username=username, password=password, market=market, period_range=period_range)
     adreal_fetcher.login()
     stats_data = adreal_fetcher.fetch_data(
         parent_brand_ids,
