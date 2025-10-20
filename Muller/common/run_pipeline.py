@@ -13,7 +13,7 @@ def main():
     password = access_secret("adreal-password")
     # Muller Competitors
     parent_brand_ids = [
-            "94444", "17127", "13367", "51367", "11943", "12681", "37469", "13343", "93853", "94501", "157", "13341", "14195"
+            "94444", "17127", "13367", "68697", "11943", "12681", "37469", "13343", "93853", "94501", "157", "13341", "14195"
         ]
 
     df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
