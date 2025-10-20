@@ -82,12 +82,12 @@ def fetch_adreal_data(request):
         username = access_secret("adreal-username")
         password = access_secret("adreal-password")
 
-        # Procredit competitors
+        # Danone competitors
         parent_brand_ids = [
             "94443", "159", "158", "14167", "14174", "13344", "23697", "12684", "17607", "67048", "94272", 
-            "94494", "93768", "93812", "94489", "94490", "94214", "94484", "94554", "43854", "94570",# Grija la carpos
+            "94494", "93768", "93812", "94489", "94490", "94214", "94484", "94554", "43854", "94570", # Grija la carpos
             "94553", "92370", "94542", "94568", "94569", "94550", "17128", "30946", "97254", "94552",
-            "94540"
+            "94540",
         ]
 
         # Fetch and process data
