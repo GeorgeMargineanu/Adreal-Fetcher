@@ -13,7 +13,7 @@ def main():
     password = access_secret("adreal-password")
     # ProCredit Competitors
     parent_brand_ids = [
-        "1760", "163", "17972", "96818"
+        "1760", "163", "17972", "96818", "88946"
         ]   
 
     df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)

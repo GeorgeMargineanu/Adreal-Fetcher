@@ -84,7 +84,7 @@ def fetch_adreal_data(request):
 
         # Danone competitors
         parent_brand_ids = [
-            "1760", "163", "17972", "96818"
+            "1760", "163", "17972", "96818", "88946"
         ]
 
         # Fetch and process data

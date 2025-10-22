@@ -134,7 +134,7 @@ def main():
         password = access_secret("adreal-password")
 
         parent_brand_ids = [
-            "1760", "163", "17972", "96818"
+            "1760", "163", "17972", "96818", "88946"
             ]   
 
         # Fetch AdReal data for the requested month
