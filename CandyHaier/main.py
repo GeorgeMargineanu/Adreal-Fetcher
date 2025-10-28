@@ -4,7 +4,7 @@ import pandas as pd
 import traceback
 
 PROJECT_ID = "ums-adreal-471711"
-TABLE_ID = f"{PROJECT_ID}.DLG.DataImport"
+TABLE_ID = f"{PROJECT_ID}.CandyHaier.DataImport"
 
 def access_secret(secret_id, version_id="latest"):
     """Fetch a secret from Secret Manager."""
@@ -84,7 +84,7 @@ def fetch_adreal_data(request):
 
         # Muller competitors
         parent_brand_ids = ["947", "1551", "1056", "5297", "1709", "12988", "15875", "1248", "15652", "76815", "2126", "17574"]
-        
+
         # Fetch and process data
         df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
         print("DataFrame fetched. Shape:", df.shape)
