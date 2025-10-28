@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 
 class AdRealFetcher:
     def __init__(self, username, password, market="ro",
-                 period_range="20250801,20250831,month",
+                 period_range="20250901,20250930,month",
                  brand_ids="", limit=10000, max_threads=5, target_metric="ad_cont,ru"):
         self.BASE_URL = "https://adreal.gemius.com/api"
         self.LOGIN_URL = f"{self.BASE_URL}/login/?next=/api/"
@@ -25,7 +25,7 @@ class AdRealFetcher:
         self.all_results = []
 
         # conservative default: product + content type (you can expand later)
-        self.combined_segments = "brand_owner,brand,product,content_type,website,publisher,platform"
+        self.combined_segments = "brand_owner,brand,product,content_type,website,page_type,platform"
         # computed period label we will filter stats by (e.g. "month_20250801")
         self.period_label = self._period_label_from_range(period_range)
 
@@ -197,29 +197,3 @@ class AdRealFetcher:
         df.to_excel(filename, index=False)
         print(f"Saved {len(df)} rows to {filename}")
         return df
-
-# ---------------- MAIN DEMO ----------------
-if __name__ == "__main__":
-    start_time = time.time()
-
-    USERNAME = ""
-    PASSWORD = ""
-
-    fetcher = AdRealFetcher(username=USERNAME, password=PASSWORD, brand_ids="13549")
-
-    # login using your session method
-    fetcher.login()
-
-    # list platforms so you can see what 'pc' corresponds to (id/code)
-    platforms = fetcher.list_platforms()
-
-    # try support-style query for Dream&co (95638)
-    brand_to_test = 13549
-    support_results = fetcher.fetch_data([brand_to_test], platforms="pc",
-                                                 page_types="search,social,standard",
-                                                 segments="brand,product,content_type,website", limit=1000000)
-    #fetcher.save_json("support_results.json", support_results)
-    #fetcher.flatten_to_excel("support_results.xlsx", results=support_results, filter_period=True)
-
-    end_time = time.time()
-    print(f"Done in {round((end_time - start_time)/60, 2)} minutes")
