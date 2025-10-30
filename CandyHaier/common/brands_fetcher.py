@@ -35,29 +35,49 @@ class BrandFetcher:
 
     def add_other_children(self, brands, start_id=10000000):
         """
-        For each brand with parent_id = None, add a new child named 'Other'.
-        IDs will start at `start_id` but will bump to > max(existing ids) to avoid collisions.
+        For each ROOT brand (parent_id is None), add a single child named 'Other'
+        IFF such a child doesn't already exist. IDs start at start_id and avoid collisions.
         """
-        # Ensure we don't collide with any existing IDs
+        # Existing IDs (avoid collisions)
         existing_ids = [b.get("id") for b in brands if "id" in b]
         max_existing = max(existing_ids) if existing_ids else 0
         next_id = max(start_id, max_existing + 1)
 
-        # (Optional) sort for deterministic output
+        # Build quick lookup: parent_id -> list of children
+        from collections import defaultdict
+        children_by_parent = defaultdict(list)
+        for b in brands:
+            pid = b.get("parent_id")
+            if pid is not None:
+                children_by_parent[pid].append(b)
+
         roots = [b for b in brands if b.get("parent_id") is None]
-        roots.sort(key=lambda x: x.get("id", 0))
 
         new_entries = []
-        for brand in roots:
+        for root in roots:
+            # check if an 'Other' child already exists (case-insensitive)
+            existing_other = any(
+                (child.get("name") or "").strip().lower() == "other"
+                for child in children_by_parent.get(root["id"], [])
+            )
+            if existing_other:
+                continue
+
             new_entries.append({
                 "id": next_id,
-                "encrypted_id": None,   # or generate if you prefer
-                "parent_id": brand["id"],
-                "name": "Other"
+                "encrypted_id": None,
+                "parent_id": root["id"],
+                "name": "Other",
             })
             next_id += 1
 
+        if new_entries:
+            print(f"Added {len(new_entries)} synthetic 'Other' children.")
+        else:
+            print("No synthetic 'Other' children added (all roots already had one).")
+
         return brands + new_entries
+
 
     # ---------------- FETCH ----------------
     def fetch_brands(self, period):

@@ -38,8 +38,56 @@ def get_brand_owner(brand_id, brands_lookup):
 
     return owner_name
 
+def get_owner_from_id(node_id, brands_lookup):
+    """
+    Climb parents from a given node_id until a root is found; return that root's name.
+    """
+    current_id = node_id
+    owner_name = None
+    while current_id:
+        info = brands_lookup.get(current_id)
+        if not info:
+            return owner_name
+        owner_name = info.get("name")
+        parent_id = info.get("parent_id")
+        if not parent_id:
+            return owner_name
+        current_id = parent_id
+    return owner_name
+
+
+def is_top_level_other(node_id, brands_lookup):
+    info = brands_lookup.get(node_id)
+    if not info:
+        return False
+    return (info.get("parent_id") is None) and (str(info.get("name", "")).strip().lower() == "other")
+
+
+def normalize_owner(brand_id, product_raw, brands_lookup):
+    """
+    1) Try brand lineage (as today).
+    2) If owner is 'Other' (top-level) or missing, try product lineage.
+    3) Return the best owner string.
+    """
+    owner = get_owner_from_id(brand_id, brands_lookup) if brand_id else None
+
+    # If owner is 'Other' at top-level (API bucket) or missing, try product lineage
+    if (owner is None) or (owner.strip().lower() == "other" and is_top_level_other(brand_id, brands_lookup)):
+        # Resolve product_id from raw (can be dict or id)
+        product_id = None
+        if product_raw is not None:
+            if isinstance(product_raw, dict):
+                product_id = product_raw.get("id") or product_raw.get("value")  # API sometimes uses 'id' or 'value'
+            else:
+                product_id = product_raw
+        if product_id:
+            product_owner = get_owner_from_id(product_id, brands_lookup)
+            if product_owner:
+                return product_owner
+
+    return owner
+
 def merge_data(stats_data, brands_data, websites_data):
-    """Merge stats + brand + websites lookups, filling Brand owner & Product properly."""
     brands_lookup = return_lookup(brands_data)
     websites_lookup = return_lookup(websites_data)
 
@@ -51,47 +99,45 @@ def merge_data(stats_data, brands_data, websites_data):
         brand_id = segment.get("brand")
         brand_info = brands_lookup.get(brand_id, {})
         brand_name = brand_info.get("name", brand_id)
-        
-        # Use the fixed, recursive function to find the true Brand Owner
-        brand_owner_name = get_brand_owner(brand_id, brands_lookup) 
 
-        # 🎯 FIX: Robustly get Product name, handling API's ID or Dict format
+        # Robust Product resolution (keep what you had + also keep raw for owner fallback)
+        product_raw = segment.get("product")
         product_name = None
-        if "product" in segment:
-            product_val = segment["product"]
-            if isinstance(product_val, dict):
-                # API sometimes returns a dictionary with 'label' or 'name' directly
-                product_name = product_val.get("label", product_val.get("name"))
+        if product_raw is not None:
+            if isinstance(product_raw, dict):
+                product_name = product_raw.get("label", product_raw.get("name"))
             else:
-                # Value is an ID, look it up in the brands lookup
-                product_name = brands_lookup.get(product_val, {}).get("name", product_val)
+                product_name = brands_lookup.get(product_raw, {}).get("name", product_raw)
+
+        # ✅ NEW: owner that prefers product lineage when brand is a top-level 'Other'
+        brand_owner_name = normalize_owner(brand_id, product_raw, brands_lookup)
 
         website_name = websites_lookup.get(segment.get("website"), {}).get("name", segment.get("website"))
 
         content_type = segment.get("content_type")
-        # Ensure we use the API's content type unless it's genuinely missing
         if not content_type or content_type == "None":
-            content_type = decide_content_type(website_name) # Fallback to URL check
+            content_type = decide_content_type(website_name)
 
         for stat in stats_list:
             row = {
                 "period": stat.get("period"),
                 "brand_owner_name": brand_owner_name,
                 "brand_name": brand_name,
-                "Product": product_name, # <-- Direct mapping to BQ column name
+                "Product": product_name,
                 "website_name": website_name,
                 "platform": segment.get("platform", None),
                 "content_type": content_type,
             }
-            # add values
+            # values
             for k, v in stat.get("values", {}).items():
                 row[k] = v
-            # add uncertainty
+            # uncertainty
             for k, v in stat.get("uncertainty", {}).items():
                 row[f"{k}_uncertainty"] = v
             all_rows.append(row)
 
     return all_rows
+
 
 def decide_content_type(website):
     """Fallback if API doesn't provide content_type."""
