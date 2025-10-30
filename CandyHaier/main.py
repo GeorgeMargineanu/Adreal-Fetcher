@@ -45,6 +45,45 @@ def push_to_bigquery(df):
     df["MediaChannel"] = df["MediaChannel"].astype(str)
     df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors="coerce").fillna(0).astype(int)
 
+    # NEW SECTION: filter out unwanted brands
+    excluded_brands = [
+        "LG mobile devices",
+        "LG TV",
+        "LG Speakers",
+        "LG Soundbar",
+        "LG Monitors",
+        "LG Laptops",
+        "LG Earphones / Headphones",
+        "Samsung Tech Institute",
+        "Samsung TV",
+        "Samsung Smartwatch",
+        "Samsung Shop App",
+        "Samsung Monitors",
+        "Samsung Memory Cards",
+        "Samsung Laptops / PC",
+        "Samsung Home Audio",
+        "Samsung Knox Suite",
+        "Samsung Health",
+        "Samsung Hardware",
+        "Samsung Galaxy Z",
+        "Samsung Galaxy Tab",
+        "Samsung Galaxy S",
+        "Samsung Galaxy Fold",
+        "Samsung Galaxy Ring",
+        "Samsung Galaxy A",
+        "Samsung Earphones/Headphones",
+        "Samsung AI (artificial inteli)",
+        "Samsung VXT",
+        "Gorenje - Ice Cream Machine",
+        "Hisense TV",
+        "Bosch - Grass Trimmer",
+        "Bosch Auto",
+        "Bosch Professional",
+        "Bosch Boilers and Central Heating",
+    ]
+
+    df = df[~df["Brand"].isin(excluded_brands)].copy()
+
     print("Preview of data to load:")
     print(df.head())
 
@@ -82,8 +121,8 @@ def fetch_adreal_data(request):
         username = access_secret("adreal-username")
         password = access_secret("adreal-password")
 
-        # Muller competitors
-        parent_brand_ids = ["947", "1551", "1056", "5297", "1709", "12988", "15875", "1248", "15652", "76815", "2126", "17574"]
+        # CandyHaier competitors
+        parent_brand_ids = ["76815", "1056", "947", "2126", "12988", "15651", "1708", "15875", "1551", "92605", "1248", "17575", "90577", "91050", "5297", "35135"]
 
         # Fetch and process data
         df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
