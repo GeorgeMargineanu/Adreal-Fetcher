@@ -59,6 +59,7 @@ class BrandFetcher:
 
         return brands + new_entries
 
+
     # ---------------- FETCH ----------------
     def fetch_brands(self, period):
         """Fetch all brands for a given period (handles pagination with threads)."""
@@ -92,11 +93,13 @@ class BrandFetcher:
             for future in as_completed(futures):
                 results.extend(future.result())
 
+        #self.all_brands = results
+        print(f"Done! Fetched {len(results)} brands for {period}")
         results = self.add_other_children(results)
         self.all_brands = results
-        print(f"Done! Fetched {len(results)} brands for {period}")
+
         return results
-    
+
     # ---------------- SAVE ----------------
     def save_json(self, filename="brands.json"):
         with open(filename, "w", encoding="utf-8") as f:
@@ -111,11 +114,11 @@ class BrandFetcher:
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     fetcher = BrandFetcher(
-        username = "",
-        password = "",
+        username = "UnitedRO_Teo.Zamfirescu",
+        password = "TeopassUM25",
         market="ro",
     )
     fetcher.login()
-    fetcher.fetch_brands(period="month_20250801")
+    fetcher.fetch_brands(period="month_20250901")
     fetcher.save_json("brands.json")
     #fetcher.save_csv("brands.csv")
