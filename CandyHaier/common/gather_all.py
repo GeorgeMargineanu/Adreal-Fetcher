@@ -96,11 +96,15 @@ def merge_data(stats_data, brands_data, websites_data):
         segment = entry.get("segment", {})
         stats_list = entry.get("stats", [])
 
+        # Lookups
+        website_id = segment.get("website")
+        website_name = websites_lookup.get(website_id, {}).get("name", website_id)
+
         brand_id = segment.get("brand")
-        brand_info = brands_lookup.get(brand_id, {})
+        brand_info = brands_lookup.get(brand_id, {}) if brand_id else {}
         brand_name = brand_info.get("name", brand_id)
 
-        # Robust Product resolution (keep what you had + also keep raw for owner fallback)
+        # Product (keep your robust logic)
         product_raw = segment.get("product")
         product_name = None
         if product_raw is not None:
@@ -109,11 +113,15 @@ def merge_data(stats_data, brands_data, websites_data):
             else:
                 product_name = brands_lookup.get(product_raw, {}).get("name", product_raw)
 
-        # ✅ NEW: owner that prefers product lineage when brand is a top-level 'Other'
-        brand_owner_name = normalize_owner(brand_id, product_raw, brands_lookup)
+        # ✅ Prefer owner from API when present
+        owner_id = segment.get("brand_owner")
+        if owner_id in brands_lookup:
+            brand_owner_name = brands_lookup[owner_id].get("name")
+        else:
+            # Fallback: your existing resolver
+            brand_owner_name = normalize_owner(brand_id, product_raw, brands_lookup)
 
-        website_name = websites_lookup.get(segment.get("website"), {}).get("name", segment.get("website"))
-
+        # Content type
         content_type = segment.get("content_type")
         if not content_type or content_type == "None":
             content_type = decide_content_type(website_name)
@@ -121,23 +129,21 @@ def merge_data(stats_data, brands_data, websites_data):
         for stat in stats_list:
             row = {
                 "period": stat.get("period"),
-                "brand_owner_name": brand_owner_name,
-                "brand_name": brand_name,
+                "brand_owner_name": brand_owner_name,  # <- now aligns with the UI (“Samsung Electronics”)
+                "brand_name": brand_name,              # <- can be literally “Other”
                 "Product": product_name,
                 "website_name": website_name,
                 "platform": segment.get("platform", None),
                 "content_type": content_type,
             }
-            # values
-            for k, v in stat.get("values", {}).items():
-                row[k] = v
-            # uncertainty
+            # values + uncertainty
+            row.update(stat.get("values", {}))
             for k, v in stat.get("uncertainty", {}).items():
                 row[f"{k}_uncertainty"] = v
+
             all_rows.append(row)
 
     return all_rows
-
 
 def decide_content_type(website):
     """Fallback if API doesn't provide content_type."""
@@ -234,7 +240,7 @@ def run_adreal_pipeline(username, password, market="ro", parent_brand_ids=None):
         parent_brand_ids,
         platforms="pc",
         page_types="search,social,standard",
-        segments="brand,product,content_type,website",
+        segments="brand_owner,brand,product,content_type,website",
         limit=1000000
     )
 
