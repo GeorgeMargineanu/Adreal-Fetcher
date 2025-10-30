@@ -83,6 +83,7 @@ def push_to_bigquery(df):
     ]
 
     df = df[~df["Brand"].isin(excluded_brands)].copy()
+    df = df[~df["Product"].isin(excluded_brands)].copy()
 
     print("Preview of data to load:")
     print(df.head())
@@ -122,7 +123,7 @@ def fetch_adreal_data(request):
         password = access_secret("adreal-password")
 
         # CandyHaier competitors
-        parent_brand_ids = ["76815", "1056", "947", "2126", "12988", "15651", "1708", "15875", "1551", "92605", "1248", "17575", "90577", "91050", "5297", "35135"]
+        parent_brand_ids = ["76815", "1056", "947", "2126", "12988", "15651", "1708", "15875", "1551", "92605", "1248", "17575", "90577", "91050", "5298", "35135"]
 
         # Fetch and process data
         df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
