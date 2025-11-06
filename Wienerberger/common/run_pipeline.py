@@ -13,7 +13,7 @@ def main():
     password = access_secret("adreal-password")
     # WienerBerger Competitors
     parent_brand_ids = ["20217", "21445", "36509", "25456", "28621", "89931", "65043", "14387", "21069", "21327", "93174",
-                            "59328", "21317", "31820", "58218", "47648", "37811", "39467", "96041", "96267", "62704", "51584"]
+                        "59328", "21317", "31820", "58218", "47648", "37811", "39467", "96041", "96267", "62704", "51584"]
     
     df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
     print(f"Data fetched: {len(df)} rows")
