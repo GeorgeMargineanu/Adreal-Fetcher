@@ -18,7 +18,7 @@ def push_to_bigquery(df):
     """Load DataFrame into BigQuery, replacing only the current month(s)."""
     client = bigquery.Client()
 
-    # Rename columns to match BigQuery schema
+    # Normalize incoming column names → BQ schema
     df = df.rename(columns={
         "Brand owner": "BrandOwner",
         "Brand": "Brand",
@@ -28,44 +28,56 @@ def push_to_bigquery(df):
         "Ad contacts": "AdContacts",
     })
 
-    # Ensure required columns exist
-    required_cols = ["Date", "BrandOwner", "Brand", "ContentType", "MediaChannel", "AdContacts"]
-    for col in required_cols:
+    # Ensure required columns exist (include Product!)
+    required_defaults = {
+        "Date": pd.NaT,
+        "BrandOwner": None,
+        "Brand": None,
+        "Product": None,          # <- was missing
+        "ContentType": None,
+        "MediaChannel": None,
+        "AdContacts": 0,
+    }
+    for col, default in required_defaults.items():
         if col not in df.columns:
-            df[col] = None
+            df[col] = default
 
-    # NEW SECTION: filter out unwanted brands
-    excluded_brands = [
-        "Agilia", "Chronolia", "Structo Plus"
-    ]
-
+    # Exclude unwanted brands (works even if values are NaN)
+    excluded_brands = ["Agilia", "Chronolia", "Structo Plus"]
     df = df[~df["Brand"].isin(excluded_brands)].copy()
     df = df[~df["Product"].isin(excluded_brands)].copy()
 
-    # Correct types
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
-    df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors="coerce").fillna(0).astype(int)
+    # Types
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df["AdContacts"] = pd.to_numeric(df["AdContacts"], errors="coerce").fillna(0).astype(int)
 
-    # Determine month(s) in the new data
-    months = df["Date"].apply(lambda x: x.replace(day=1)).unique()
+    # Determine months present, robust to NaT
+    months = (
+        df["Date"]
+        .dt.to_period("M")
+        .dropna()
+        .unique()
+    )
 
-    # Delete old rows for these months (partition-aware if table is partitioned)
-    for month in months:
+    # Delete old rows for those months (skip if none)
+    for p in months:
         delete_query = f"""
         DELETE FROM `{TABLE_ID}`
-        WHERE EXTRACT(YEAR FROM Date) = {month.year}
-          AND EXTRACT(MONTH FROM Date) = {month.month}
+        WHERE EXTRACT(YEAR FROM Date) = {p.year}
+          AND EXTRACT(MONTH FROM Date) = {p.month}
         """
         client.query(delete_query).result()
 
+    # Convert Date to DATE (no time) for loading, if your BQ column is DATE
+    df["Date"] = df["Date"].dt.date
+
     # Load new data
-    job_config = bigquery.LoadJobConfig(
-        write_disposition="WRITE_APPEND"
-    )
+    job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
     load_job = client.load_table_from_dataframe(df, TABLE_ID, job_config=job_config)
     load_job.result()
 
-    return f"Loaded {len(df)} rows into {TABLE_ID} (replacing months: {months})"
+    replaced_months_str = ", ".join(str(m) for m in months) if len(months) else "none"
+    return f"Loaded {len(df)} rows into {TABLE_ID} (replaced months: {replaced_months_str})"
 
 
 def fetch_adreal_data(request):
