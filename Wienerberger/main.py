@@ -34,6 +34,14 @@ def push_to_bigquery(df):
         if col not in df.columns:
             df[col] = None
 
+    # NEW SECTION: filter out unwanted brands
+    excluded_brands = [
+        "Agilia", "Chronolia", "Structo Plus"
+    ]
+
+    df = df[~df["Brand"].isin(excluded_brands)].copy()
+    df = df[~df["Product"].isin(excluded_brands)].copy()
+
     # Correct types
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
     df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors="coerce").fillna(0).astype(int)
@@ -67,8 +75,8 @@ def fetch_adreal_data(request):
         password = access_secret("adreal-password")
 
         # Wienerberger competitors
-        parent_brand_ids = ["20217", "21445", "36509", "25456", "28621", "89931", "65043", "14387", "21069", "21327", "93174",
-                            "59328", "21317", "31820", "58218", "47648", "37811", "39467", "96041", "96267", "62704", "51584"]
+        parent_brand_ids = ["62704", "63564", "31818", "96040", "21067", "37811", "93174", "25456", "36509", "76926", "20216", "21444", "27612", "14387", "28621", "58218", "84106", "52053", 
+                            "21327", "89931", "96266", "47648", "20215", "59328", "51584", "88822", "39467", "13381"]
    
         # Fetch and process data
         df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
