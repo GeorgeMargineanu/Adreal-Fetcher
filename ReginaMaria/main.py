@@ -68,23 +68,18 @@ def fetch_adreal_data(request):
 
         # ReginaMaria competitors
         """
-        2	Clinica Sante
-        3	MedLife
-        4	Medicover
-        5	NN Romania
-        6	NN Romania - Asigurari de Viata
-        7	NN Romania - Asigurari de sanatate
-        8	NN Romania - Pensii
-        9	NN-Asigurari de sanatate
-        10	REGINA MARIA
-        11	Sanador
-        12	SanoPass
-        13	Spitalul Monza
-        14	Synevo
-        15	Nativia
-        16	Ponderas
+        1	Clinica Sante
+        2 MedLife
+        3 Medicover
+        9	REGINA MARIA
+        10	Sanador
+        11	SanoPass
+        12	Spitalul Monza
+        13	Synevo
+        14	Nativia
+        15	Ponderas
         """
-        parent_brand_ids = ["42639", "13210", "10219", "16243", "78907", "42251", "94386", "42251", "14420", "32949", "96640", "52448", "85900", "97624", "15799"]
+        parent_brand_ids = ["42639", "13210", "10219",  "14420", "32949", "96640", "52448", "85900", "97624", "15799"]
    
         # Fetch and process data
         df = run_adreal_pipeline(username, password, parent_brand_ids=parent_brand_ids)
