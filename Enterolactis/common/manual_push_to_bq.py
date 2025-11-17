@@ -54,8 +54,6 @@ def clean_manual_data(df, date_string):
 
     # Ensure correct column order
     expected_columns = ["Date", "BrandOwner", "Brand", "ContentType", "MediaOwner", "MediaChannel", "AdContacts"]
-    if "Product" in df.columns:
-        expected_columns.insert(3, "Product")
     df = df.reindex(columns=expected_columns)
 
     if "AdContacts" in df.columns:
