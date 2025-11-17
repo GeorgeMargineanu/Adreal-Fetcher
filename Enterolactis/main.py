@@ -28,7 +28,7 @@ def push_to_bigquery(df):
     })
 
     # Ensure all required columns exist
-    required_cols = ["Date", "BrandOwner", "Brand", "Product", "ContentType", "MediaChannel", "AdContacts"]
+    required_cols = ["Date", "BrandOwner", "Brand", "ContentType", "MediaChannel", "AdContacts"]
     for col in required_cols:
         if col not in df.columns:
             df[col] = None  # Fill missing columns with None
@@ -40,50 +40,16 @@ def push_to_bigquery(df):
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
     df["BrandOwner"] = df["BrandOwner"].astype(str)
     df["Brand"] = df["Brand"].astype(str)
-    df["Product"] = df["Product"].astype(str)
     df["ContentType"] = df["ContentType"].astype(str)
     df["MediaChannel"] = df["MediaChannel"].astype(str)
     df["AdContacts"] = pd.to_numeric(df.get("AdContacts"), errors="coerce").fillna(0).astype(int)
 
     # NEW SECTION: filter out unwanted brands
     excluded_brands = [
-        "LG mobile devices",
-        "LG TV",
-        "LG Speakers",
-        "LG Soundbar",
-        "LG Monitors",
-        "LG Laptops",
-        "LG Earphones / Headphones",
-        "Samsung Tech Institute",
-        "Samsung TV",
-        "Samsung Smartwatch",
-        "Samsung Shop App",
-        "Samsung Monitors",
-        "Samsung Memory Cards",
-        "Samsung Laptops / PC",
-        "Samsung Home Audio",
-        "Samsung Knox Suite",
-        "Samsung Health",
-        "Samsung Hardware",
-        "Samsung Galaxy Z",
-        "Samsung Galaxy Tab",
-        "Samsung Galaxy S",
-        "Samsung Galaxy Fold",
-        "Samsung Galaxy Ring",
-        "Samsung Galaxy A",
-        "Samsung Earphones/Headphones",
-        "Samsung AI (artificial inteli)",
-        "Samsung VXT",
-        "Gorenje - Ice Cream Machine",
-        "Hisense TV",
-        "Bosch - Grass Trimmer",
-        "Bosch Auto",
-        "Bosch Professional",
-        "Bosch Boilers and Central Heating",
+        "",
     ]
 
     df = df[~df["Brand"].isin(excluded_brands)].copy()
-    df = df[~df["Product"].isin(excluded_brands)].copy()
 
     print("Preview of data to load:")
     print(df.head())
