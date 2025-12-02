@@ -112,7 +112,25 @@ Has roles:
 To manually push data for a specific month, run this command from the repository root:
 
 ```bash
-python -m common.manual_push_to_bq 2025 8
+python -m common.manual_push_to_bq 2025 8 --it works if you already set the parent ids in the script. it accepts just args YEAR and MONTH
+python -m common.manual_push_to_bq 2025 10 --industries "312,345,314,319" - does not need parent ids, but industries (ids).
+it accepts year, month + industries as in the example
+
+For more info consult the api to get the induestries you want to query.
+GET /api/ro/industries/?limit=1013
+{
+  "id": 359,
+  "encrypted_id": "py4jqJPEmRGt1b6OfXFc5A==",
+  "parent_id": 311,
+  "name": "Automotive spare parts and services"
+},
+{
+  "id": 360,
+  "encrypted_id": "sVw8D5mlxGs_7VgQTCbBNA==",
+  "parent_id": 359,
+  "name": "Fuels, oils, lubricants"
+},
+
 ```
 
 > ⚠️ **CRITICAL WARNING:**  
