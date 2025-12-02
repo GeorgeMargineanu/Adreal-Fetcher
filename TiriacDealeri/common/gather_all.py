@@ -175,7 +175,7 @@ def run_adreal_pipeline(username, password, market="ro", parent_brand_ids=None):
         platforms="pc",
         page_types="search,social,standard",
         segments="brand,product,content_type,website",
-        industries="312", #311 not working
+        industries="312,345,314,319", #Automotive dealers, Semi-trailers, trailers, Passenger cars
         limit=1000000
     )
 

@@ -148,7 +148,7 @@ class AdRealFetcher:
             "segments": segments,
         }
 
-        # ✅ Only send brands param if you actually want to filter by brands
+        # Only send brands param if you actually want to filter by brands
         if brand_ids:
             if isinstance(brand_ids, (list, tuple)):
                 brands_param = ",".join(map(str, brand_ids))
@@ -156,7 +156,7 @@ class AdRealFetcher:
                 brands_param = str(brand_ids)
             params["brands"] = brands_param
 
-        # ✅ Add industries if provided
+        # Add industries if provided
         if industries:
             params["industries"] = industries
 
